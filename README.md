@@ -56,7 +56,15 @@ All endpoints respond with a standard standardized JSON wrapper:
 }
 ```
 
-### 1. User Module (`/api/users`)
+> **Security Note**: All endpoints beneath `/api/*` (except `/api/auth/*` and `/health`) are **protected via JWT Authentication**. You must pass a valid token via the request headers: `Authorization: Bearer <token>`.
+
+### 1. Authentication Module (`/api/auth`)
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `POST` | `/api/auth/signup` | `{ email, password, fullName? }` | `{ user, token }` | Registers a new user and returns JWT |
+| `POST` | `/api/auth/login` | `{ email, password }` | `{ user, token }` | Authenticates user and returns JWT |
+
+### 2. User Module (`/api/users`)
 | Method | Endpoint | Payload / Query | Returns | Description |
 |---|---|---|---|---|
 | `GET` | `/api/users` | - | `Array<User>` | Fetches all users |
@@ -67,7 +75,7 @@ All endpoints respond with a standard standardized JSON wrapper:
 | `PUT` | `/api/users/:id` | `{ ...userFieldsToUpdate }` | `User` | Updates a specific user |
 | `DELETE`| `/api/users/:id` | `params: { id }` | `{ deleted: true }` | Deletes a user |
 
-### 2. Campaign Module (`/api/campaigns`)
+### 3. Campaign Module (`/api/campaigns`)
 | Method | Endpoint | Payload / Query | Returns | Description |
 |---|---|---|---|---|
 | `GET` | `/api/campaigns` | - | `Array<Campaign>` | Fetches all campaigns |
@@ -76,7 +84,7 @@ All endpoints respond with a standard standardized JSON wrapper:
 | `PUT` | `/api/campaigns/:id` | `{ ...campaignFieldsToUpdate }` | `Campaign` | Updates a campaign |
 | `DELETE`| `/api/campaigns/:id`| `params: { id }` | `{ deleted: true }` | Deletes a campaign |
 
-### 3. Project Module (`/api/projects`)
+### 4. Project Module (`/api/projects`)
 | Method | Endpoint | Payload / Query | Returns | Description |
 |---|---|---|---|---|
 | `GET` | `/api/projects` | - | `Array<Project>` | Fetches all projects |
@@ -85,7 +93,7 @@ All endpoints respond with a standard standardized JSON wrapper:
 | `PUT` | `/api/projects/:id` | `{ ...projectFieldsToUpdate }` | `Project` | Updates a project |
 | `DELETE`| `/api/projects/:id` | `params: { id }` | `{ deleted: true }` | Deletes a project |
 
-### 4. Asset Module (`/api/assets`)
+### 5. Asset Module (`/api/assets`)
 | Method | Endpoint | Payload / Query | Returns | Description |
 |---|---|---|---|---|
 | `GET` | `/api/assets` | - | `Array<Asset>` | Fetches all creative assets |
@@ -93,7 +101,7 @@ All endpoints respond with a standard standardized JSON wrapper:
 | `GET` | `/api/assets/:id` | `params: { id }` | `Asset` | Fetches asset metadata |
 | `DELETE`| `/api/assets/:id` | `params: { id }` | `{ deleted: true }` | Deletes an asset |
 
-### 5. Template Module (`/api/templates`)
+### 6. Template Module (`/api/templates`)
 | Method | Endpoint | Payload / Query | Returns | Description |
 |---|---|---|---|---|
 | `GET` | `/api/templates` | - | `Array<Template>` | Fetches all templates |
@@ -102,7 +110,7 @@ All endpoints respond with a standard standardized JSON wrapper:
 | `PUT` | `/api/templates/:id`| `{ ...templateFieldsToUpdate }` | `Template` | Updates a template |
 | `DELETE`| `/api/templates/:id`| `params: { id }` | `{ deleted: true }` | Deletes a template |
 
-### 6. Agent Module (`/api/agents`)
+### 7. Agent Module (`/api/agents`)
 | Method | Endpoint | Payload / Query | Returns | Description |
 |---|---|---|---|---|
 | `GET` | `/api/agents` | - | `Array<Agent>` | Fetches all AI agents |
@@ -112,7 +120,7 @@ All endpoints respond with a standard standardized JSON wrapper:
 | `DELETE`| `/api/agents/:id` | `params: { id }` | `{ deleted: true }` | Deletes an agent |
 | `POST` | `/api/agents/:id/execute`| `{ taskData }` | `Agent` | Updates agent status to "processing" to handle task |
 
-### 7. Core & Billing
+### 8. Core & Billing
 | Method | Endpoint | Payload / Query | Returns | Description |
 |---|---|---|---|---|
 | `GET` | `/health` | - | `String: "OK"` | Healthcheck |

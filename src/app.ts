@@ -9,6 +9,8 @@ import projectRoutes from './modules/project';
 import assetRoutes from './modules/asset';
 import templateRoutes from './modules/template';
 import agentRoutes from './modules/agent';
+import authRoutes from './modules/auth';
+import { authMiddleware } from './middleware/auth';
 
 const app = express();
 
