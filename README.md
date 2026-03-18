@@ -25,6 +25,12 @@ This is the Express.js backend for the Raver.ai platform, providing a robust RES
    JWT_SECRET="your_super_secret_jwt_key_here"
    ```
 
+3. Initialize the database and generate the Prisma Client:
+   ```bash
+   npx prisma generate
+   npx prisma db push
+   ```
+
 ### Running the Application
 
 To start the server in development mode with live-reloading enabled:
