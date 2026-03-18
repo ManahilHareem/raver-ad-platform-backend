@@ -15,9 +15,10 @@ This is the Express.js backend for the Raver.ai platform, providing a robust RES
    npm install
    ```
 
-2. Configure your environment variables. Ensure you have a `.env` file in the root directory and add your PostgreSQL database URL. For example:
+2. Configure your environment variables. Ensure you have a `.env` file in the root directory and add your PostgreSQL database URL and a JWT Secret. For example:
    ```env
    DATABASE_URL="postgresql://[USER]:[PASSWORD]@[RDS_ENDPOINT]:[PORT]/[DATABASE_NAME]?schema=public"
+   JWT_SECRET="your_super_secret_jwt_key_here"
    ```
 
 ### Running the Application
