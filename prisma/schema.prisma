@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String     @unique
+  fullName   String?
+  avatarUrl  String?
+  createdAt  DateTime   @default(now()) @db.Timestamptz
+  updatedAt  DateTime   @default(now()) @db.Timestamptz
+  campaigns  Campaign[]
+  agents     Agent[]
+}
+
+model Campaign {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id])
+  name      String
+  status    String    @default("draft")
+  platform  String?
+  budget    Decimal?  @db.Decimal(12, 2)
+  startDate DateTime? @db.Timestamptz
+  endDate   DateTime? @db.Timestamptz
+  config    Json?
+  createdAt DateTime  @default(now()) @db.Timestamptz
+  metrics   Metric[]
+}
+
+model Agent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id])
+  name      String
+  type      String?
+  status    String   @default("idle")
+  createdAt DateTime @default(now()) @db.Timestamptz
+}
+
+model Metric {
+  id          BigInt    @id @default(autoincrement())
+  campaignId  String    @db.Uuid
+  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+  impressions Int       @default(0)
+  clicks      Int       @default(0)
+  spend       Decimal   @default(0.00) @db.Decimal(12, 2)
+  recordedAt  DateTime  @default(now()) @db.Timestamptz
+}
