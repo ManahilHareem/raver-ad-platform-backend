@@ -6,6 +6,7 @@ export const getUsers = async (req: Request, res: Response) => {
     const users = await userService.getAllUsers();
     res.json({ success: true, data: users });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: 'Failed to fetch users' });
   }
 };
@@ -19,24 +20,31 @@ export const getUser = async (req: Request, res: Response) => {
     }
     res.json({ success: true, data: user });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: 'Failed to fetch user' });
   }
 };
 
 export const getMe = async (req: Request, res: Response) => {
   try {
-    const user = await userService.getMe();
+    const authReq = req as any; // Cast to access user from middleware
+    const user = await userService.getMe(authReq.user?.id);
     res.json({ success: true, data: user });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: 'Failed to fetch current user' });
   }
 };
 
 export const updateSettings = async (req: Request, res: Response) => {
   try {
-    const result = await userService.updateSettings(req.body);
+    const authReq = req as any;
+    if (!authReq.user?.id) throw new Error("Unauthorized");
+    
+    const result = await userService.updateSettings(authReq.user.id, req.body);
     res.json({ success: true, data: result });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: 'Failed to update settings' });
   }
 };
@@ -46,6 +54,7 @@ export const createUser = async (req: Request, res: Response) => {
     const user = await userService.createUser(req.body);
     res.status(201).json({ success: true, data: user });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: 'Failed to create user' });
   }
 };
@@ -56,6 +65,7 @@ export const updateUser = async (req: Request, res: Response) => {
     const user = await userService.updateUser(id as string, req.body);
     res.json({ success: true, data: user });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: 'Failed to update user' });
   }
 };
@@ -66,6 +76,7 @@ export const deleteUser = async (req: Request, res: Response) => {
     await userService.deleteUser(id as string);
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: 'Failed to delete user' });
   }
 };

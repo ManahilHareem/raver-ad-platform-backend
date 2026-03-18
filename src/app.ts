@@ -27,12 +27,15 @@ app.get('/api/health', (req, res) => {
 });
 
 // Register modules
-app.use('/api/users', userRoutes);
-app.use('/api/campaigns', campaignRoutes);
-app.use('/api/billing', billingRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/assets', assetRoutes);
-app.use('/api/templates', templateRoutes);
-app.use('/api/agents', agentRoutes);
+app.use('/api/auth', authRoutes);
+
+// Protected routes
+app.use('/api/users', authMiddleware, userRoutes);
+app.use('/api/campaigns', authMiddleware, campaignRoutes);
+app.use('/api/billing', authMiddleware, billingRoutes);
+app.use('/api/projects', authMiddleware, projectRoutes);
+app.use('/api/assets', authMiddleware, assetRoutes);
+app.use('/api/templates', authMiddleware, templateRoutes);
+app.use('/api/agents', authMiddleware, agentRoutes);
 
 export default app;

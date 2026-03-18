@@ -1,3 +1,4 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; // Temporary flag to allow AWS self-signed certs
 import app from './app';
 import dotenv from 'dotenv';
 

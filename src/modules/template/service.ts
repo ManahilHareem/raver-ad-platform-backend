@@ -1,42 +1,30 @@
-export const getTemplates = async () => {
-  // Mock data as Prisma model for Template doesn't exist yet
-  return [
-    {
-      id: "mock-template-1",
-      name: "Standard Promo",
-      category: "ecommerce",
-      isPublic: true,
-      data: {
-        nodes: []
-      }
-    }
-  ];
+import prisma from '../../db/prisma';
+
+export const getAllTemplates = async () => {
+  return await prisma.template.findMany();
 };
 
 export const createTemplate = async (data: any) => {
-  return {
-    id: `mock-template-${Date.now()}`,
-    name: data.name || "New Template",
-    category: data.category || "general",
-    isPublic: data.isPublic !== undefined ? data.isPublic : false,
-    data: data.data || { nodes: [] }
-  };
+  return await prisma.template.create({
+    data
+  });
 };
 
-export const getTemplate = async (id: string) => {
-  return {
-    id,
-    name: "Mock Template Data",
-    category: "general",
-    isPublic: true,
-    data: { nodes: [] }
-  };
+export const getTemplateById = async (id: string) => {
+  return await prisma.template.findUnique({
+    where: { id }
+  });
 };
 
 export const updateTemplate = async (id: string, data: any) => {
-  return { id, ...data, updatedAt: new Date().toISOString() };
+  return await prisma.template.update({
+    where: { id },
+    data
+  });
 };
 
 export const deleteTemplate = async (id: string) => {
-  return { id, deleted: true };
+  return await prisma.template.delete({
+    where: { id }
+  });
 };

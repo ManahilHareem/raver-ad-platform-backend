@@ -1,64 +1,92 @@
 import prisma from '../../db/prisma';
 
-export const getAllUsers = async () => {
-  return await prisma.user.findMany();
+const isValidUuid = (uuid: string) => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid);
 };
 
-export const getUserById = async (id: string) => {
-  return await prisma.user.findUnique({
-    where: { id },
+export const getAllUsers = async () => {
+  return await prisma.user.findMany({ 
+    select: { 
+      id: true, email: true, fullName: true, professionalRole: true, bio: true, 
+      avatarUrl: true, instagram: true, facebook: true, twitter: true, linkedin: true, 
+      website: true, campaignUpdates: true, aiInsights: true, teamActivity: true, 
+      weeklySummary: true, createdAt: true 
+    } 
   });
 };
 
-export const getMe = async () => {
-  try {
-    const users = await prisma.user.findMany({ take: 1 });
-    if (users.length > 0) return users[0];
-  } catch (error) {
-    console.warn("Prisma failed, using mock data for getMe fallback.");
-  }
-  return { id: "mock-user-1", email: "mock@example.com", fullName: "Mock User" };
+export const getUserById = async (id: string) => {
+  if (!isValidUuid(id)) return null;
+  return await prisma.user.findUnique({
+    where: { id },
+    select: { 
+      id: true, email: true, fullName: true, professionalRole: true, bio: true, 
+      avatarUrl: true, instagram: true, facebook: true, twitter: true, linkedin: true, 
+      website: true, campaignUpdates: true, aiInsights: true, teamActivity: true, 
+      weeklySummary: true, createdAt: true 
+    }
+  });
 };
 
-export const updateSettings = async (data: any) => {
-  // Mock settings update
-  return { status: "success", updated: true };
+export const getMe = async (id?: string) => {
+  if (!id || !isValidUuid(id)) return null;
+  return await prisma.user.findUnique({
+    where: { id },
+    select: { 
+      id: true, email: true, fullName: true, professionalRole: true, bio: true, 
+      avatarUrl: true, instagram: true, facebook: true, twitter: true, linkedin: true, 
+      website: true, campaignUpdates: true, aiInsights: true, teamActivity: true, 
+      weeklySummary: true, createdAt: true 
+    }
+  });
+};
+
+export const updateSettings = async (id: string, data: any) => {
+  if (!isValidUuid(id)) throw new Error('Invalid User ID format');
+  // Can be mapped to billing/settings later based on exact schema fields required
+  return await prisma.user.update({
+    where: { id },
+    data
+  });
 };
 
 export const createUser = async (data: any) => {
-  try {
-    return await prisma.user.create({
-      data: {
-        email: data.email || `mock-${Date.now()}@example.com`,
-        fullName: data.fullName || "New User",
-        avatarUrl: data.avatarUrl || ""
-      }
-    });
-  } catch (error) {
-    console.warn("Prisma failed, using mock data for createUser fallback.");
-    return { id: `mock-user-${Date.now()}`, ...data };
-  }
+  return await prisma.user.create({
+    data
+  });
 };
 
 export const updateUser = async (id: string, data: any) => {
-  try {
-    return await prisma.user.update({
-      where: { id },
-      data
-    });
-  } catch (error) {
-    console.warn("Prisma failed, using mock data for updateUser fallback.");
-    return { id, ...data, updated: true };
-  }
+  if (!isValidUuid(id)) throw new Error('Invalid User ID format');
+  // Filter out fields that are not in the schema or that we don't want to update via this endpoint
+  const allowedFields = [
+    'fullName', 'professionalRole', 'bio', 'avatarUrl', 
+    'instagram', 'facebook', 'twitter', 'linkedin', 'website',
+    'campaignUpdates', 'aiInsights', 'teamActivity', 'weeklySummary'
+  ];
+  const filteredData: any = {};
+  
+  Object.keys(data).forEach(key => {
+    if (allowedFields.includes(key)) {
+      filteredData[key] = data[key];
+    }
+  });
+
+  return await prisma.user.update({
+    where: { id },
+    data: filteredData,
+    select: { 
+      id: true, email: true, fullName: true, professionalRole: true, bio: true, 
+      avatarUrl: true, instagram: true, facebook: true, twitter: true, linkedin: true, 
+      website: true, campaignUpdates: true, aiInsights: true, teamActivity: true, 
+      weeklySummary: true, createdAt: true 
+    }
+  });
 };
 
 export const deleteUser = async (id: string) => {
-  try {
-    return await prisma.user.delete({
-      where: { id }
-    });
-  } catch (error) {
-    console.warn("Prisma failed, returning success for deleteUser mock.");
-    return { id, deleted: true };
-  }
+  if (!isValidUuid(id)) throw new Error('Invalid User ID format');
+  return await prisma.user.delete({
+    where: { id }
+  });
 };

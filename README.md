@@ -60,7 +60,7 @@ All endpoints respond with a standard standardized JSON wrapper:
 > **Security Note**: All endpoints beneath `/api/*` (except `/api/auth/*` and `/health`) are **protected via JWT Authentication**. You must pass a valid token via the request headers: `Authorization: Bearer <token>`.
 
 ### 1. Authentication Module (`/api/auth`)
-| Method | Endpoint | Payload / Query | Returns | Description |
+| Method | Endpoint | Payload / Query | Returns | Description åå|
 |---|---|---|---|---|
 | `POST` | `/api/auth/signup` | `{ email, password, fullName? }` | `{ user, token }` | Registers a new user and returns JWT |
 | `POST` | `/api/auth/login` | `{ email, password }` | `{ user, token }` | Authenticates user and returns JWT |

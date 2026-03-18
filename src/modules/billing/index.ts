@@ -5,5 +5,7 @@ const router = Router();
 
 router.get('/subscription', billingController.getSubscription);
 router.post('/payment-methods', billingController.addPaymentMethod);
+router.put('/payment-methods/:id', billingController.updatePaymentMethod);
+router.get('/payment-methods', billingController.getPaymentMethods);
 
 export default router;
