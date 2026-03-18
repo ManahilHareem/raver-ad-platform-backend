@@ -46,11 +46,75 @@ The project follows a modular, domain-driven architecture:
   - `template/` - Reusable node-based ad templates
   - `user/` - User profiles and settings
 
-## 🔌 API Status & Health
+## 🔌 API Endpoints Documentation
 
-All modules support full CRUD functionality (Create, Read, Update, Delete) utilizing standard REST conventions (e.g., `GET /api/projects/:id`, `POST /api/campaigns`). 
-
-To verify that the application is successfully running, you can hit the health check endpoint:
-```bash
-curl http://localhost:5000/health
+All endpoints respond with a standard standardized JSON wrapper:
+```json
+{
+  "success": true,
+  "data": { ... } // or "message": "..." on errors/deletes
+}
 ```
+
+### 1. User Module (`/api/users`)
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `GET` | `/api/users` | - | `Array<User>` | Fetches all users |
+| `POST` | `/api/users` | `{ email, fullName?, avatarUrl? }` | `User` | Creates a new user |
+| `GET` | `/api/users/me` | - | `User` | Fetches active authenticated user |
+| `PUT` | `/api/users/settings` | `{ theme, notifications... }` | `{ updated: true }` | Updates active user settings |
+| `GET` | `/api/users/:id` | `params: { id }` | `User` | Fetches a specific user |
+| `PUT` | `/api/users/:id` | `{ ...userFieldsToUpdate }` | `User` | Updates a specific user |
+| `DELETE`| `/api/users/:id` | `params: { id }` | `{ deleted: true }` | Deletes a user |
+
+### 2. Campaign Module (`/api/campaigns`)
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `GET` | `/api/campaigns` | - | `Array<Campaign>` | Fetches all campaigns |
+| `POST` | `/api/campaigns` | `{ name, platform, budget, config }` | `Campaign` | Creates a new ad campaign |
+| `GET` | `/api/campaigns/:id` | `params: { id }` | `Campaign` | Fetches a specific campaign |
+| `PUT` | `/api/campaigns/:id` | `{ ...campaignFieldsToUpdate }` | `Campaign` | Updates a campaign |
+| `DELETE`| `/api/campaigns/:id`| `params: { id }` | `{ deleted: true }` | Deletes a campaign |
+
+### 3. Project Module (`/api/projects`)
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `GET` | `/api/projects` | - | `Array<Project>` | Fetches all projects |
+| `POST` | `/api/projects` | `{ name, description? }` | `Project` | Creates a new project |
+| `GET` | `/api/projects/:id` | `params: { id }` | `Project` | Fetches a specific project |
+| `PUT` | `/api/projects/:id` | `{ ...projectFieldsToUpdate }` | `Project` | Updates a project |
+| `DELETE`| `/api/projects/:id` | `params: { id }` | `{ deleted: true }` | Deletes a project |
+
+### 4. Asset Module (`/api/assets`)
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `GET` | `/api/assets` | - | `Array<Asset>` | Fetches all creative assets |
+| `POST` | `/api/assets/upload`| `{ filename, contentType }` | `{ uploadUrl, assetId }` | Returns a pre-signed S3 upload URL |
+| `GET` | `/api/assets/:id` | `params: { id }` | `Asset` | Fetches asset metadata |
+| `DELETE`| `/api/assets/:id` | `params: { id }` | `{ deleted: true }` | Deletes an asset |
+
+### 5. Template Module (`/api/templates`)
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `GET` | `/api/templates` | - | `Array<Template>` | Fetches all templates |
+| `POST` | `/api/templates` | `{ name, category, isPublic, data }` | `Template` | Creates a new template |
+| `GET` | `/api/templates/:id`| `params: { id }` | `Template` | Fetches a specific template |
+| `PUT` | `/api/templates/:id`| `{ ...templateFieldsToUpdate }` | `Template` | Updates a template |
+| `DELETE`| `/api/templates/:id`| `params: { id }` | `{ deleted: true }` | Deletes a template |
+
+### 6. Agent Module (`/api/agents`)
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `GET` | `/api/agents` | - | `Array<Agent>` | Fetches all AI agents |
+| `POST` | `/api/agents` | `{ name, type, status }` | `Agent` | Provisions a new AI agent |
+| `GET` | `/api/agents/:id` | `params: { id }` | `Agent` | Fetches a specific agent |
+| `PUT` | `/api/agents/:id` | `{ ...agentFieldsToUpdate }` | `Agent` | Updates agent configuration |
+| `DELETE`| `/api/agents/:id` | `params: { id }` | `{ deleted: true }` | Deletes an agent |
+| `POST` | `/api/agents/:id/execute`| `{ taskData }` | `Agent` | Updates agent status to "processing" to handle task |
+
+### 7. Core & Billing
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `GET` | `/health` | - | `String: "OK"` | Healthcheck |
+| `GET` | `/api/billing/subscription` | - | `SubscriptionData` | Fetches active subscription plan |
+| `POST` | `/api/billing/payment-methods` | `{ stripeToken }` | `{ status: "success" }` | Attaches payment method |
