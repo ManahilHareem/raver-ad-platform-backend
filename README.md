@@ -131,8 +131,24 @@ All endpoints respond with a standard standardized JSON wrapper:
 | `POST` | `/api/billing/payment-methods` | `{ cardHolderName, cardNumber, expiryDate, cvv, isDefault }` | `PaymentMethod` | Adds a new payment method |
 | `PUT` | `/api/billing/payment-methods/:id` | `{ ...fields }` | `PaymentMethod` | Updates a payment method |
 
-## 🛡️ Security & Validation
+## 🛠️ Common Commands
 
-- **JWT Authentication**: All `/api/*` routes (except auth) require a Bearer token.
-- **UUID Validation**: All incoming `id` and `userId` parameters are validated against the UUID v4 format. Invalid formats return a 404 or a graceful error instead of crashing.
-- **Atomic Operations**: Uses Prisma transactions and upserts for reliable data consistency.
+Use these commands during development to keep your environment in sync:
+
+### Prisma & Database
+| Command | Description |
+|---|---|
+| `npx prisma generate` | Regenerates the Prisma Client (run this after schema changes) |
+| `npx prisma db push` | Pushes schema changes to the RDS instance (dev only) |
+| `npx prisma studio` | Opens a GUI to view and edit your database data |
+
+### Development
+| Command | Description |
+|---|---|
+| `npm run dev` | Starts the Express server with nodemon |
+| `npx tsc --noEmit` | Runs a full TypeScript type check across the project |
+
+### 💡 Fixing IDE Type Errors
+If your IDE (like VS Code) shows red squiggles on valid Prisma properties (e.g., `paymentMethod`):
+1. Press `CMD + Shift + P`.
+2. Type `TypeScript: Restart TS Server` and press Enter.
