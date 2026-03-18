@@ -86,9 +86,40 @@ All endpoints respond with a standard standardized JSON wrapper:
 | `DELETE`| `/api/campaigns/:id`| `params: { id }` | `{ deleted: true }` | Deletes a campaign |
 
 ### 4. Project Module (`/api/projects`)
-...
-(No changes to Project, Asset, Template, Agent sections)
-...
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `GET` | `/api/projects` | - | `Array<Project>` | Fetches all projects |
+| `POST` | `/api/projects` | `{ name, description? }` | `Project` | Creates a new project |
+| `GET` | `/api/projects/:id` | `params: { id }` | `Project` | Fetches a specific project |
+| `PUT` | `/api/projects/:id` | `{ ...projectFieldsToUpdate }` | `Project` | Updates a project |
+| `DELETE`| `/api/projects/:id` | `params: { id }` | `{ deleted: true }` | Deletes a project |
+
+### 5. Asset Module (`/api/assets`)
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `GET` | `/api/assets` | - | `Array<Asset>` | Fetches all creative assets |
+| `POST` | `/api/assets/upload`| `{ filename, contentType }` | `{ uploadUrl, assetId }` | Returns a pre-signed S3 upload URL |
+| `GET` | `/api/assets/:id` | `params: { id }` | `Asset` | Fetches asset metadata |
+| `DELETE`| `/api/assets/:id` | `params: { id }` | `{ deleted: true }` | Deletes an asset |
+
+### 6. Template Module (`/api/templates`)
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `GET` | `/api/templates` | - | `Array<Template>` | Fetches all templates |
+| `POST` | `/api/templates` | `{ name, category, isPublic, data }` | `Template` | Creates a new template |
+| `GET` | `/api/templates/:id`| `params: { id }` | `Template` | Fetches a specific template |
+| `PUT` | `/api/templates/:id`| `{ ...templateFieldsToUpdate }` | `Template` | Updates a template |
+| `DELETE`| `/api/templates/:id`| `params: { id }` | `{ deleted: true }` | Deletes a template |
+
+### 7. Agent Module (`/api/agents`)
+| Method | Endpoint | Payload / Query | Returns | Description |
+|---|---|---|---|---|
+| `GET` | `/api/agents` | - | `Array<Agent>` | Fetches all AI agents |
+| `POST` | `/api/agents` | `{ name, type, status }` | `Agent` | Provisions a new AI agent |
+| `GET` | `/api/agents/:id` | `params: { id }` | `Agent` | Fetches a specific agent |
+| `PUT` | `/api/agents/:id` | `{ ...agentFieldsToUpdate }` | `Agent` | Updates agent configuration |
+| `DELETE`| `/api/agents/:id` | `params: { id }` | `{ deleted: true }` | Deletes an agent |
+| `POST` | `/api/agents/:id/execute`| `{ taskData }` | `Agent` | Updates agent status to "processing" to handle task |
 
 ### 8. Core & Billing (`/api/billing`)
 | Method | Endpoint | Payload / Query | Returns | Description |
