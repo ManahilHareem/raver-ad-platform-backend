@@ -6,58 +6,83 @@ const isValidUuid = (uuid: string) => {
 
 export const getSubscriptionPlan = async (userId: string) => {
   if (!isValidUuid(userId)) return { planTier: 'free', status: 'active' };
-  const plan = await prisma.billing.findUnique({
-    where: { userId }
-  });
-  
-  if (!plan) {
-    // If billing doesn't explicitly exist yet, standard default free
-    return { planTier: 'free', status: 'active' };
+  try {
+    const plan = await prisma.billing.findUnique({
+      where: { userId }
+    });
+    
+    if (!plan) {
+      // If billing doesn't explicitly exist yet, standard default free
+      return { planTier: 'free', status: 'active' };
+    }
+    return plan;
+  } catch (error) {
+    console.error(`Error fetching subscription plan for user ID (${userId}):`, error);
+    throw new Error('Billing database query failed');
   }
-  return plan;
 };
 
 export const updateSubscriptionPlan = async (userId: string, planTier: string) => {
   if (!isValidUuid(userId)) throw new Error('Invalid User ID format');
-  return await prisma.billing.upsert({
-    where: { userId },
-    update: { planTier },
-    create: { userId, planTier }
-  });
+  try {
+    return await prisma.billing.upsert({
+      where: { userId },
+      update: { planTier },
+      create: { userId, planTier }
+    });
+  } catch (error) {
+    console.error(`Error updating subscription plan for user ID (${userId}):`, error);
+    throw new Error('Could not update billing record');
+  }
 };
 
 export const addPaymentMethod = async (userId: string, data: any) => {
   if (!isValidUuid(userId)) throw new Error('Invalid User ID format');
-  return await prisma.paymentMethod.create({
-    data: {
-      userId,
-      cardHolderName: data.cardHolderName || data.cardholderName, // Match frontend lowercase 'h'
-      cardNumber: data.cardNumber,
-      expiryDate: data.expiryDate,
-      cvv: data.cvv,
-      isDefault: data.isDefault || false
-    }
-  });
+  try {
+    return await prisma.paymentMethod.create({
+      data: {
+        userId,
+        cardHolderName: data.cardHolderName || data.cardholderName, // Match frontend lowercase 'h'
+        cardNumber: data.cardNumber,
+        expiryDate: data.expiryDate,
+        cvv: data.cvv,
+        isDefault: data.isDefault || false
+      }
+    });
+  } catch (error) {
+    console.error(`Error adding payment method for user ID (${userId}):`, error);
+    throw new Error('Payment method creation failed');
+  }
 };
 
 export const updatePaymentMethod = async (id: string, userId: string, data: any) => {
   if (!isValidUuid(id) || !isValidUuid(userId)) throw new Error('Invalid ID format');
-  return await prisma.paymentMethod.update({
-    where: { id, userId },
-    data: {
-      cardHolderName: data.cardHolderName || data.cardholderName, // Match frontend lowercase 'h'
-      cardNumber: data.cardNumber,
-      expiryDate: data.expiryDate,
-      cvv: data.cvv,
-      isDefault: data.isDefault
-    }
-  });
+  try {
+    return await prisma.paymentMethod.update({
+      where: { id, userId },
+      data: {
+        cardHolderName: data.cardHolderName || data.cardholderName, // Match frontend lowercase 'h'
+        cardNumber: data.cardNumber,
+        expiryDate: data.expiryDate,
+        cvv: data.cvv,
+        isDefault: data.isDefault
+      }
+    });
+  } catch (error) {
+    console.error(`Error updating payment method ID (${id}):`, error);
+    throw new Error('Payment method update failed');
+  }
 };
 
 export const getPaymentMethods = async (userId: string) => {
   if (!isValidUuid(userId)) return [];
-  return await prisma.paymentMethod.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' }
-  });
+  try {
+    return await prisma.paymentMethod.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    });
+  } catch (error) {
+    console.error(`Error fetching payment methods for user ID (${userId}):`, error);
+    throw new Error('Could not retrieve payment methods');
+  }
 };
