@@ -16,8 +16,8 @@ COPY . .
 # Build the TypeScript code
 RUN npm run build
 
-# Expose port (matching .env.example)
-EXPOSE 5000
+# Expose port 8000
+EXPOSE 8000
 
 # Start the application
 CMD ["npm", "start"]
