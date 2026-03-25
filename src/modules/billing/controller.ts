@@ -4,7 +4,11 @@ import * as billingService from './service'; // Resync TS server
 export const getSubscription = async (req: Request, res: Response) => {
   try {
     const authReq = req as any;
-    const subscription = await billingService.getSubscriptionPlan(authReq.user?.id || 'mock-id');
+    const userId = authReq.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    const subscription = await billingService.getSubscriptionPlan(userId);
     res.json({ success: true, data: subscription });
   } catch (error) {
     console.error(error);

@@ -13,9 +13,21 @@ export const getAssets = async (req: Request, res: Response) => {
 
 export const uploadAsset = async (req: Request, res: Response) => {
   try {
-    // Currently mocked since s3 prep isn't in actual Prisma definition directly
-    const uploadData = { uploadUrl: "https://mock-s3-bucket.amazonaws.com", assetId: "mock-asset" };
-    res.status(201).json({ success: true, data: uploadData });
+    const { filename, contentType } = req.body;
+    if (!filename || !contentType) {
+      return res.status(400).json({ success: false, message: 'filename and contentType are required' });
+    }
+
+    const { uploadUrl, key } = await assetService.getPresignedUploadUrl(filename, contentType);
+    
+    // Return the URL and the key (which will be used as the asset's URI after upload)
+    res.status(201).json({ 
+      success: true, 
+      data: { 
+        uploadUrl, 
+        assetId: key 
+      } 
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Failed to generate upload URL' });

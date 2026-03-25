@@ -22,6 +22,8 @@
   },
   "homepage": "https://github.com/ManahilHareem/raver-ad-platform-backend#readme",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1016.0",
+    "@aws-sdk/s3-request-presigner": "^3.1016.0",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "bcryptjs": "^3.0.3",
