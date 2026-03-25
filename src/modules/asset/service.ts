@@ -3,22 +3,29 @@ import s3Client from '../../config/s3';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-export const getAllAssets = async () => {
+export const getAllAssets = async (userId: string) => {
   try {
-    return await prisma.asset.findMany();
+    const assets = await prisma.asset.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    console.log(`[AssetService] Found ${assets.length} assets for user ${userId}`);
+    return assets;
   } catch (error) {
-    console.error('Error fetching all assets:', error);
+    console.error('[AssetService] Error fetching assets for user:', userId, error);
     throw new Error('Could not fetch assets from database.');
   }
 };
 
 export const createAsset = async (data: any) => {
   try {
-    return await prisma.asset.create({
+    const asset = await prisma.asset.create({
       data
     });
+    console.log(`[AssetService] Created asset ${asset.id} for user ${data.userId}`);
+    return asset;
   } catch (error) {
-    console.error('Error creating asset:', error);
+    console.error('[AssetService] Error creating asset:', error);
     throw new Error('Could not save asset to database.');
   }
 };
@@ -45,6 +52,32 @@ export const deleteAsset = async (id: string) => {
   }
 };
 
+export const getUserStorageStats = async (userId: string) => {
+  try {
+    const assets = await prisma.asset.findMany({
+      where: { userId },
+      select: { fileSize: true }
+    });
+
+    const totalAssets = assets.length;
+    const storageUsedBytes = assets.reduce((sum: number, asset: any) => sum + (asset.fileSize || 0), 0);
+    const quotaBytes = 1 * 1024 * 1024 * 1024; // 1 GB in bytes
+    const storageAvailableBytes = Math.max(0, quotaBytes - storageUsedBytes);
+
+    return {
+      totalAssets,
+      storageUsedBytes,
+      storageAvailableBytes,
+      quotaBytes,
+      storageUsedMB: (storageUsedBytes / (1024 * 1024)).toFixed(2),
+      storageAvailableMB: (storageAvailableBytes / (1024 * 1024)).toFixed(2),
+    };
+  } catch (error) {
+    console.error('[AssetService] Error calculating storage stats:', userId, error);
+    throw new Error('Could not calculate storage statistics.');
+  }
+};
+
 export const getPresignedUploadUrl = async (fileName: string, contentType: string) => {
   try {
     const bucketName = process.env.AWS_S3_BUCKET_NAME;
@@ -52,16 +85,30 @@ export const getPresignedUploadUrl = async (fileName: string, contentType: strin
       throw new Error('AWS_S3_BUCKET_NAME is not defined in environment variables');
     }
 
+    // Clean filename: remove everything except alphanumeric and dots
+    const extension = fileName.includes('.') ? fileName.split('.').pop() : '';
+    const baseName = fileName.includes('.') ? fileName.split('.').slice(0, -1).join('.') : fileName;
+    
+    const cleanBase = baseName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-') // Replace non-alphanumeric with hyphen
+      .replace(/-+/g, '-')       // Replace multiple hyphens with one
+      .replace(/^-|-$/g, '');    // Trim hyphens from ends
+
+    const cleanFileName = extension ? `${cleanBase}.${extension}` : cleanBase;
+    const key = `assets/${Date.now()}-${cleanFileName}`;
+
     const command = new PutObjectCommand({
       Bucket: bucketName,
-      Key: `assets/${Date.now()}-${fileName}`,
+      Key: key,
       ContentType: contentType,
     });
 
     const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    console.log(`[AssetService] Generated pre-signed URL for key: ${key}`);
     return { uploadUrl, key: command.input.Key };
   } catch (error) {
-    console.error('Error generating pre-signed URL:', error);
+    console.error('[AssetService] Error generating pre-signed URL:', error);
     throw new Error('Could not generate pre-signed URL.');
   }
 };

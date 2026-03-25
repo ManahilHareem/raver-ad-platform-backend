@@ -7,115 +7,101 @@ datasource db {
 }
 
 model User {
-  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email      String     @unique
-  password   String?
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email            String          @unique
   fullName         String?
-  professionalRole String?
-  bio              String?
   avatarUrl        String?
-  instagram        String?
+  createdAt        DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime        @default(now()) @db.Timestamptz(6)
+  password         String?
+  bio              String?
   facebook         String?
-  twitter          String?
+  instagram        String?
   linkedin         String?
+  professionalRole String?
+  twitter          String?
   website          String?
-  
-  // Notification Preferences
-  campaignUpdates  Boolean    @default(true)
-  aiInsights       Boolean    @default(true)
-  teamActivity     Boolean    @default(true)
-  weeklySummary    Boolean    @default(true)
-  
-  createdAt  DateTime   @default(now()) @db.Timestamptz
-  updatedAt  DateTime   @default(now()) @db.Timestamptz
-  
-  billing    Billing?
-  projects   Project[]
-  campaigns  Campaign[]
-  assets           Asset[]
+  aiInsights       Boolean         @default(true)
+  campaignUpdates  Boolean         @default(true)
+  teamActivity     Boolean         @default(true)
+  weeklySummary    Boolean         @default(true)
   agents           Agent[]
+  assets           Asset[]
+  billing          Billing?
+  campaigns        Campaign[]
   paymentMethods   PaymentMethod[]
+  projects         Project[]
 }
 
 model PaymentMethod {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId         String   @db.Uuid
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   cardHolderName String
-  cardNumber     String   // Should prioritize tokenization (Stripe) in production
-  expiryDate     String   // Format: MM/YY
-  cvv            String?  // Sensitive: storing CVV is generally discouraged
+  cardNumber     String
+  expiryDate     String
+  cvv            String?
   isDefault      Boolean  @default(false)
-  createdAt      DateTime @default(now()) @db.Timestamptz
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Billing {
-  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId             String    @unique @db.Uuid
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stripeCustomerId   String?
-  planTier           String    @default("free")
-  status             String    @default("active")
-  currentPeriodEnd   DateTime? @db.Timestamptz
-  createdAt          DateTime  @default(now()) @db.Timestamptz
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @unique @db.Uuid
+  stripeCustomerId String?
+  planTier         String    @default("free")
+  status           String    @default("active")
+  currentPeriodEnd DateTime? @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Project {
   id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId      String     @db.Uuid
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   name        String
   description String?
   status      String     @default("active")
-  createdAt   DateTime   @default(now()) @db.Timestamptz
-  
+  createdAt   DateTime   @default(now()) @db.Timestamptz(6)
   campaigns   Campaign[]
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Campaign {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId   String?   @db.Uuid
-  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  userId      String    @db.Uuid
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String
-  status      String    @default("draft")
-
-  // Step 1: Basics
-  objective   String?
-  audience    String?
-
-  // Step 2: Style
-  visualStyles String[]
-  tones        String[]
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @db.Uuid
+  name         String
+  status       String    @default("draft")
+  budget       Int       @default(0)
+  startDate    DateTime? @db.Timestamptz(6)
+  endDate      DateTime? @db.Timestamptz(6)
+  config       Json?
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  projectId    String?   @db.Uuid
+  audience     String?
   colorScheme  String?
-
-  // Step 3: Delivery
-  platforms    String[]
   duration     String?
   format       String?
-
-  // Metadata
-  budget      Int       @default(0)
-  startDate   DateTime? @db.Timestamptz
-  endDate     DateTime? @db.Timestamptz
-  config      Json?
-  createdAt   DateTime  @default(now()) @db.Timestamptz
-  
-  metrics     Metric[]
-  assets      Asset[]
+  objective    String?
+  platforms    String[]
+  tones        String[]
+  visualStyles String[]
+  assets       Asset[]
+  project      Project?  @relation(fields: [projectId], references: [id])
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metrics      Metric[]
 }
 
 model Asset {
-  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId     String     @db.Uuid
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  campaignId String?    @db.Uuid
-  campaign   Campaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @db.Uuid
+  campaignId String?   @db.Uuid
   type       String
   url        String
   fileSize   Int?
-  createdAt  DateTime   @default(now()) @db.Timestamptz
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Template {
@@ -124,25 +110,25 @@ model Template {
   category  String?
   data      Json?
   isPublic  Boolean  @default(false)
-  createdAt DateTime @default(now()) @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
 }
 
 model Agent {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @db.Uuid
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
   type      String?
   status    String   @default("idle")
-  createdAt DateTime @default(now()) @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Metric {
-  id          BigInt    @id @default(autoincrement())
-  campaignId  String    @db.Uuid
-  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  impressions Int       @default(0)
-  clicks      Int       @default(0)
-  spend       Decimal   @default(0.00) @db.Decimal(12, 2)
-  recordedAt  DateTime  @default(now()) @db.Timestamptz
+  id          BigInt   @id @default(autoincrement())
+  campaignId  String   @db.Uuid
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  spend       Decimal  @default(0.00) @db.Decimal(12, 2)
+  recordedAt  DateTime @default(now()) @db.Timestamptz(6)
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 }
