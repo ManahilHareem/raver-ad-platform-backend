@@ -43,12 +43,40 @@ export const getAssetById = async (id: string) => {
 
 export const deleteAsset = async (id: string) => {
   try {
+    // 1. Fetch the asset to get the URL
+    const asset = await prisma.asset.findUnique({ where: { id } });
+    if (!asset) {
+      throw new Error('Asset not found');
+    }
+
+    // 2. Extract key from URL
+    // URL format: https://bucket.s3.region.amazonaws.com/assets/filename
+    const bucketName = process.env.AWS_S3_BUCKET_NAME;
+    if (!bucketName) throw new Error('AWS_S3_BUCKET_NAME not defined');
+    
+    // The key is everything after the bucket domain
+    // We can also extract it by finding the first occurrence of 'assets/'
+    const keyIndex = asset.url.indexOf('assets/');
+    if (keyIndex !== -1) {
+      const key = asset.url.substring(keyIndex);
+
+      // 3. Delete from S3
+      const { DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+      const deleteCommand = new DeleteObjectCommand({
+        Bucket: bucketName,
+        Key: key
+      });
+      await s3Client.send(deleteCommand);
+      console.log(`[AssetService] Deleted file from S3: ${key}`);
+    }
+
+    // 4. Delete from DB
     return await prisma.asset.delete({
       where: { id }
     });
   } catch (error) {
-    console.error(`Error deleting asset by ID (${id}):`, error);
-    throw new Error('Could not delete asset from database.');
+    console.error(`[AssetService] Error deleting asset by ID (${id}):`, error);
+    throw new Error('Could not delete asset.');
   }
 };
 
@@ -102,9 +130,12 @@ export const getPresignedUploadUrl = async (fileName: string, contentType: strin
       Bucket: bucketName,
       Key: key,
       ContentType: contentType,
-    });
+    } as any);
 
-    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+    const uploadUrl = await getSignedUrl(s3Client, command, { 
+      expiresIn: 3600,
+      signableHeaders: new Set(['host']), // ONLY sign the host, making it super easy for frontend!
+    });
     console.log(`[AssetService] Generated pre-signed URL for key: ${key}`);
     return { uploadUrl, key: command.input.Key };
   } catch (error) {
