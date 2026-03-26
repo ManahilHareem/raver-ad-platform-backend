@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './config/swagger';
 
 // Import modules
 import userRoutes from './modules/user';
@@ -10,6 +12,14 @@ import assetRoutes from './modules/asset';
 import templateRoutes from './modules/template';
 import agentRoutes from './modules/agent';
 import authRoutes from './modules/auth';
+import chatRoutes from './modules/chat';
+import aiAdsRoutes from './modules/ai-ads';
+import aiImageLeadRoutes from './modules/ai-image-lead';
+import aiAudioLeadRoutes from './modules/ai-audio-lead';
+import aiCopyLeadRoutes from './modules/ai-copy-lead';
+import aiEditorRoutes from './modules/ai-editor';
+import aiProducerRoutes from './modules/ai-producer';
+import aiDirectorRoutes from './modules/ai-director';
 import { authMiddleware } from './middleware/auth';
 
 const app = express();
@@ -29,6 +39,12 @@ app.get('/api/health', (req, res) => {
 // Register modules
 app.use('/api/auth', authRoutes);
 
+// Swagger Documentation Route
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  explorer: true,
+  customSiteTitle: "Raver Ad Platform API Docs",
+}));
+
 // Protected routes
 app.use('/api/users', authMiddleware, userRoutes);
 app.use('/api/campaigns', authMiddleware, campaignRoutes);
@@ -37,5 +53,15 @@ app.use('/api/projects', authMiddleware, projectRoutes);
 app.use('/api/assets', authMiddleware, assetRoutes);
 app.use('/api/templates', authMiddleware, templateRoutes);
 app.use('/api/agents', authMiddleware, agentRoutes);
+app.use('/api/chat', authMiddleware, chatRoutes);
+
+// AI Proxy Routes
+app.use('/api/ai/ads', authMiddleware, aiAdsRoutes);
+app.use('/api/ai/image-lead', authMiddleware, aiImageLeadRoutes);
+app.use('/api/ai/audio-lead', authMiddleware, aiAudioLeadRoutes);
+app.use('/api/ai/copy-lead', authMiddleware, aiCopyLeadRoutes);
+app.use('/api/ai/editor', authMiddleware, aiEditorRoutes);
+app.use('/api/ai/producer', authMiddleware, aiProducerRoutes);
+app.use('/api/ai/director', authMiddleware, aiDirectorRoutes);
 
 export default app;

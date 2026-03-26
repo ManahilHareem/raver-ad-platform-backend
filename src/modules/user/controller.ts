@@ -49,6 +49,46 @@ export const updateSettings = async (req: Request, res: Response) => {
   }
 };
 
+export const updateProfilePicture = async (req: Request, res: Response) => {
+  try {
+    const authReq = req as any;
+    if (!authReq.user?.id) throw new Error("Unauthorized");
+    
+    const { avatarUrl } = req.body;
+    if (!avatarUrl) {
+      return res.status(400).json({ success: false, message: 'avatarUrl is required' });
+    }
+
+    const result = await userService.updateSettings(authReq.user.id, { avatarUrl });
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to update profile picture' });
+  }
+};
+
+export const getAvatarUploadUrl = async (req: Request, res: Response) => {
+  try {
+    const authReq = req as any;
+    if (!authReq.user?.id) throw new Error("Unauthorized");
+    
+    const { fileName, contentType } = req.body;
+    if (!fileName || !contentType) {
+      return res.status(400).json({ success: false, message: 'fileName and contentType are required' });
+    }
+
+    const data = await userService.generateAvatarUploadUrl(authReq.user.id, fileName, contentType);
+    
+    // Automatically update the user profile with the future permanent URL
+    await userService.updateSettings(authReq.user.id, { avatarUrl: data.permanentUrl });
+    
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to generate avatar upload URL' });
+  }
+};
+
 export const createUser = async (req: Request, res: Response) => {
   try {
     const user = await userService.createUser(req.body);

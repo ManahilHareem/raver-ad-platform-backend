@@ -31,6 +31,18 @@ model User {
   campaigns        Campaign[]
   paymentMethods   PaymentMethod[]
   projects         Project[]
+  aiSessions       AISession[]
+}
+
+model AISession {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  sessionId String   @unique
+  tag       String?
+  type      String   // "chat", "editor", "ads", etc.
+  metadata  Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PaymentMethod {

@@ -90,3 +90,28 @@ export const deleteUser = async (id: string) => {
     where: { id }
   });
 };
+
+export const generateAvatarUploadUrl = async (userId: string, fileName: string, contentType: string) => {
+  const { PutObjectCommand } = await import('@aws-sdk/client-s3');
+  const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+  const s3Client = (await import('../../config/s3')).default;
+  
+  const bucketName = process.env.AWS_S3_BUCKET_NAME;
+  const region = process.env.AWS_REGION || 'us-east-1';
+
+  if (!bucketName) throw new Error('S3 Bucket not configured');
+
+  const extension = fileName.split('.').pop() || 'jpg';
+  const key = `avatars/${userId}-${Date.now()}.${extension}`;
+
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+    ContentType: contentType,
+  });
+
+  const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+  const permanentUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${key}`;
+
+  return { uploadUrl, permanentUrl, key };
+};
