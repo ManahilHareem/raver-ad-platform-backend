@@ -133,8 +133,7 @@ export const getPresignedUploadUrl = async (fileName: string, contentType: strin
     } as any);
 
     const uploadUrl = await getSignedUrl(s3Client, command, { 
-      expiresIn: 3600,
-      signableHeaders: new Set(['host']), // ONLY sign the host, making it super easy for frontend!
+      expiresIn: 3600
     });
     console.log(`[AssetService] Generated pre-signed URL for key: ${key}`);
     return { uploadUrl, key: command.input.Key };
