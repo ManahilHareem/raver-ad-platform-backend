@@ -8,7 +8,9 @@ const AI_BACKEND_URL = process.env.AI_BACKEND_URL || 'https://apiplatform.raver.
  */
 export const proxyPost = async (path: string, body: any) => {
   try {
-    const response = await axios.post(`${AI_BACKEND_URL}${path}`, body, {
+    const payload = body || {}; // Ensure we always send at least an empty object if undefined
+    console.log(`[AIProxy] Forwarding POST request to ${path} with body:`, JSON.stringify(payload).substring(0, 100) + '...');
+    const response = await axios.post(`${AI_BACKEND_URL}${path}`, payload, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 300000, // 5 min timeout for long AI generation tasks
     });

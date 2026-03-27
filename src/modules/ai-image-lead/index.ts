@@ -101,6 +101,30 @@ router.post('/enhance', controller.enhanceImage);
  *       200:
  *         description: Vault contents
  */
+/**
+ * @swagger
+ * /api/ai/image-lead/session:
+ *   post:
+ *     summary: Initialize a new Image Lead session
+ *     tags: [AI Image Lead]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               tag:
+ *                 type: string
+ *               metadata:
+ *                 type: object
+ *     responses:
+ *       201:
+ *         description: Session created
+ */
+router.post('/session', controller.createSession);
+
 router.get('/vault/:session_id', controller.getVault);
 
 export default router;
