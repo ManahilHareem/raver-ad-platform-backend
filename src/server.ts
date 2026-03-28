@@ -6,6 +6,8 @@ dotenv.config();
 
 const PORT = process.env.PORT || 8000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+server.timeout = Number(process.env.API_TIMEOUT) || 600000; // 10 minutes timeout for long-running AI requests
