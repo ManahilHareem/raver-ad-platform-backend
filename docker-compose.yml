@@ -29,6 +29,7 @@ services:
       - .env
     environment:
       - NODE_ENV=production
+      - API_TIMEOUT=600000
     depends_on:
       db:
         condition: service_healthy
