@@ -77,24 +77,20 @@ router.post('/', chatController.chat);
 router.get('/history/:session_id', chatController.getChatHistory);
 router.delete('/history/:session_id', chatController.deleteChatSession);
 
+router.get('/sessions', chatController.listSessionsByTag);
+
 /**
  * @swagger
- * /api/chat/sessions:
- *   get:
- *     summary: List all AI sessions filtered by tag
+ * /api/chat/new:
+ *   post:
+ *     summary: Initialize a new AI Chat session
  *     tags: [Chat]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: tag
- *         schema:
- *           type: string
- *         description: Filter sessions by this tag
  *     responses:
  *       200:
- *         description: List of sessions
+ *         description: Initialized session data
  */
-router.get('/sessions', chatController.listSessionsByTag);
+router.post('/new', chatController.newChat);
 
 export default router;

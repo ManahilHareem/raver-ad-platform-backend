@@ -1,7 +1,12 @@
 import { proxyPost, proxyGet } from '../../config/aiProxy';
 
-export const sendMessage = async (sessionId: string, message: string, websiteUrl?: string) => {
-  return proxyPost('/api/v1/chat/', { session_id: sessionId, message, website_url: websiteUrl || null });
+export const sendMessage = async (sessionId: string, message: string, websiteUrl?: string, history: any[] = []) => {
+  return proxyPost('/api/v1/chat/', { 
+    session_id: sessionId, 
+    message, 
+    website_url: websiteUrl || null,
+    history
+  });
 };
 
 export const getChatHistory = async (sessionId: string) => {
