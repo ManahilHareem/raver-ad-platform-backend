@@ -20,6 +20,7 @@ import aiCopyLeadRoutes from './modules/ai-copy-lead';
 import aiEditorRoutes from './modules/ai-editor';
 import aiProducerRoutes from './modules/ai-producer';
 import aiDirectorRoutes from './modules/ai-director';
+import aiInsightsRoutes from './modules/ai-insights';
 import { authMiddleware } from './middleware/auth';
 
 const app = express();
@@ -63,5 +64,6 @@ app.use('/api/ai/copy-lead', authMiddleware, aiCopyLeadRoutes);
 app.use('/api/ai/editor', authMiddleware, aiEditorRoutes);
 app.use('/api/ai/producer', authMiddleware, aiProducerRoutes);
 app.use('/api/ai/director', authMiddleware, aiDirectorRoutes);
+app.use('/api/ai/insights', authMiddleware, aiInsightsRoutes);
 
 export default app;

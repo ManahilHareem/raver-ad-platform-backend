@@ -92,4 +92,25 @@ router.get('/session/:session_id', controller.getSession);
  */
 router.get('/session/:session_id/update', controller.getUpdate);
 
+/**
+ * @swagger
+ * /api/ai/director/session/{session_id}:
+ *   delete:
+ *     summary: Delete an AI Director session
+ *     tags: [AI Director]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: session_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Session deleted successfully
+ */
+router.delete('/session/:session_id', controller.deleteSession);
+
 export default router;
+
