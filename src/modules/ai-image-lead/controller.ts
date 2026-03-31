@@ -131,36 +131,68 @@ export const enhanceImage = async (req: AuthRequest, res: Response): Promise<any
     }
 
     const result = await imageLeadService.enhanceImage(req.body);
+    console.log('[ImageLeadController] Enhancement result received:', JSON.stringify(result).substring(0, 500) + '...');
+
+    const data = result.data || result; // Handle both result.data and flat result
+    const finalSessionId = session_id || data.session_id;
+    const imageUrl = data.image_url;
 
     // 1. Auto-save enhanced image to ImageLeadResult (NEW Schema)
-    if (userId && result.success && result.data?.image_url && session_id) {
+    if (userId && imageUrl && finalSessionId) {
       try {
         await (prisma as any).imageLeadResult.upsert({
-          where: { sessionId: session_id },
+          where: { sessionId: finalSessionId },
           create: {
             userId,
-            sessionId: session_id,
-            mainImageUrl: result.data.image_url,
+            sessionId: finalSessionId,
+            mainImageUrl: imageUrl,
             scenes: []
           },
           update: {
-            mainImageUrl: result.data.image_url,
+            mainImageUrl: imageUrl,
           }
         });
-        console.log(`[ImageLeadController] Updated lead result with enhanced image for session ${session_id}`);
+        console.log(`[ImageLeadController] Updated lead result with enhanced image for session ${finalSessionId}`);
+
+        // 1.1 Also sync to AISession metadata
+        try {
+          await (prisma as any).aISession.upsert({
+            where: { sessionId: finalSessionId },
+            create: {
+              userId,
+              sessionId: finalSessionId,
+              type: 'image-lead',
+              metadata: {
+                mainImageUrl: imageUrl,
+                lastEnhancedAt: new Date().toISOString()
+              }
+            },
+            update: {
+              metadata: {
+                mainImageUrl: imageUrl,
+                lastEnhancedAt: new Date().toISOString()
+              }
+            }
+          });
+        } catch (me) {
+          console.error('[ImageLeadController] Failed to sync enhancement meta:', me);
+        }
+
       } catch (e) {
         console.error('[ImageLeadController] Failed to update ImageLeadResult with enhanced image:', e);
       }
     }
 
     // 2. Auto-save enhanced image to User's Asset library
-    if (userId && result.success && result.data?.image_url) {
+    if (userId && imageUrl) {
       try {
-        await assetService.createAsset({
-          userId,
-          type: 'image',
-          url: result.data.image_url,
-          fileSize: 0,
+        await (prisma as any).asset.create({
+          data: {
+            userId,
+            type: 'image',
+            url: imageUrl,
+            fileSize: 0,
+          }
         });
       } catch (e) {
         console.error('[ImageLeadController] Failed to save enhanced asset:', e);
