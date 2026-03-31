@@ -123,8 +123,10 @@ router.post('/enhance', controller.enhanceImage);
  *       201:
  *         description: Session created
  */
+router.get('/sessions', controller.listSessions);
 router.post('/session', controller.createSession);
 
 router.get('/vault/:session_id', controller.getVault);
+router.post('/sync', controller.syncVault);
 
 export default router;

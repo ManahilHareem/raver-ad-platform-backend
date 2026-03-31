@@ -32,6 +32,7 @@ model User {
   paymentMethods   PaymentMethod[]
   projects         Project[]
   aiSessions       AISession[]
+  imageLeadResults ImageLeadResult[]
 }
 
 model AISession {
@@ -102,6 +103,7 @@ model Campaign {
   project      Project?  @relation(fields: [projectId], references: [id])
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   metrics      Metric[]
+  imageLeadResults ImageLeadResult[]
 }
 
 model Asset {
@@ -143,4 +145,17 @@ model Metric {
   spend       Decimal  @default(0.00) @db.Decimal(12, 2)
   recordedAt  DateTime @default(now()) @db.Timestamptz(6)
   campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model ImageLeadResult {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @db.Uuid
+  sessionId    String    @unique
+  campaignId   String?   @db.Uuid
+  mainImageUrl String?
+  scenes       Json?
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign     Campaign? @relation(fields: [campaignId], references: [id])
 }
