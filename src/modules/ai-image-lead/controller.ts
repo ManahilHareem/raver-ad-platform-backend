@@ -25,28 +25,37 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
     // Auto-save generated images to User's Asset library
     // The AI backend returns result directly (sometimes with session_id/status: completed)
     if (userId && (result.session_id || result.status === 'completed' || result.success)) {
+      const AI_BASE = process.env.AI_BACKEND_URL || 'https://apiplatform.raver.ai';
+      const normalizeUrl = (url: string) => (url && url.startsWith('/') ? `${AI_BASE}${url}` : url);
+
       const data = result.data || result; // Handle both result.data and flat result
       const scenes: any[] = [];
       if (Array.isArray(data.images)) {
           data.images.forEach((img: any) => {
-              if (typeof img === 'string') scenes.push({ url: img });
-              else if (img.url) scenes.push({ url: img.url, label: img.label || img.filename });
+              if (typeof img === 'string') scenes.push({ url: normalizeUrl(img) });
+              else if (img.url) scenes.push({ url: normalizeUrl(img.url), label: img.label || img.filename });
           });
       }
       if (Array.isArray(data.scenes)) {
         data.scenes.forEach((s: any) => {
-          if (s.image_url) scenes.push({ url: s.image_url, label: s.label || s.id });
-          if (s.url) scenes.push({ url: s.url, label: s.label || s.filename });
+          if (s.image_url) scenes.push({ url: normalizeUrl(s.image_url), label: s.label || s.id });
+          if (s.url) scenes.push({ url: normalizeUrl(s.url), label: s.label || s.filename });
         });
       }
       if (Array.isArray(data.scene_images)) {
         data.scene_images.forEach((s: any) => {
-          if (s.image_url) scenes.push({ url: s.image_url, label: s.label || s.scene_id || s.id });
-          if (s.url) scenes.push({ url: s.url, label: s.label || s.scene_id || s.id });
+          if (s.image_url) scenes.push({ url: normalizeUrl(s.image_url), label: s.label || s.scene_id || s.id });
+          if (s.url) scenes.push({ url: normalizeUrl(s.url), label: s.label || s.scene_id || s.id });
         });
       }
 
       const finalSessionId = data.session_id || session_id || uuidv4();
+      const mainImageUrl = normalizeUrl(data.base_image_url || data.image_url || data.main_image_url || (scenes[0]?.url || null));
+
+      // Fallback: If scenes is empty but we have a main image, treat it as scene 1
+      if (scenes.length === 0 && mainImageUrl) {
+        scenes.push({ url: mainImageUrl, label: 'Scene 1' });
+      }
 
       // 1. Save results to the dedicated table (NEW)
       try {
@@ -55,11 +64,11 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
           create: {
             userId,
             sessionId: finalSessionId,
-            mainImageUrl: data.base_image_url || data.image_url || data.main_image_url || (scenes[0]?.url || null),
+            mainImageUrl: mainImageUrl,
             scenes: scenes,
           },
           update: {
-            mainImageUrl: data.base_image_url || data.image_url || data.main_image_url || (scenes[0]?.url || null),
+            mainImageUrl: mainImageUrl,
             scenes: scenes,
           }
         });
@@ -74,14 +83,14 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
               sessionId: finalSessionId,
               type: 'image-lead',
               metadata: {
-                mainImageUrl: data.base_image_url || data.image_url || data.main_image_url || (scenes[0]?.url || null),
+                mainImageUrl: mainImageUrl,
                 scenes: scenes,
                 lastGeneratedAt: new Date().toISOString()
               }
             },
             update: {
               metadata: {
-                mainImageUrl: data.base_image_url || data.image_url || data.main_image_url || (scenes[0]?.url || null),
+                mainImageUrl: mainImageUrl,
                 scenes: scenes,
                 lastGeneratedAt: new Date().toISOString()
               }
