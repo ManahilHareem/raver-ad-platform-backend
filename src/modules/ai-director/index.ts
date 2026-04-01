@@ -38,6 +38,38 @@ const router = Router();
  */
 router.post('/chat', controller.chat);
 
+
+
+/**
+ * @swagger
+ * /api/ai/director/chat:
+ *   post:
+ *     summary: Send a message to the Raver Director AI
+ *     tags: [AI Director]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [session_id, message]
+ *             properties:
+ *               session_id:
+ *                 type: string
+ *               message:
+ *                 type: string
+ *               professional_name:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Director response
+ */
+router.post('/regenerate-chat', controller.regenerateChat);
+
+
+
 /**
  * @swagger
  * /api/ai/director/sessions:

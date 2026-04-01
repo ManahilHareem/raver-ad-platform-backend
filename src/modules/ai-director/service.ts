@@ -10,4 +10,4 @@ export const deleteSession = async (sessionId: string) => {
   // This serves as a placeholder to signify successful session removal from our backend/UI.
   return { success: true, message: `Session ${sessionId} cleared successfully` };
 };
-
+export const regenerateChat = (body: any) => proxyPost(`/api/v1/producer/campaign/${body.session_id}/regenerate`, body);

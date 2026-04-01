@@ -240,3 +240,63 @@ export const deleteSession = async (req: AuthRequest, res: Response): Promise<an
     });
   }
 };
+
+export const regenerateChat = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const userId = req.user?.id;
+    const { session_id, message } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    // 1. Load context from DB if it's an existing session
+    let existingHistory: any[] = [];
+    let existingMetadata: any = {};
+    if (session_id) {
+      const session = await (prisma as any).aISession.findUnique({ where: { sessionId: session_id } });
+      if (session) {
+        existingMetadata = session.metadata || {};
+        existingHistory = Array.isArray(existingMetadata.history) ? existingMetadata.history : [];
+      }
+    }
+
+    // 2. Append User Message
+    const userMessage = { role: 'user', content: message || req.body.content };
+    const updatedHistory = [...existingHistory, userMessage];
+
+    // 3. Request AI response
+    const aiRequestPayload = {
+      ...req.body,
+      history: updatedHistory
+    };
+    const result = await directorService.regenerateChat(aiRequestPayload);
+
+    // 4. Append Assistant Message
+    const assistantMessage = {
+      role: 'assistant',
+      content: result.message || result.content || (typeof result === 'string' ? result : JSON.stringify(result))
+    };
+    const finalHistory = [...updatedHistory, assistantMessage];
+
+    // 5. Persist to DB (Source of Truth for Conversation)
+    const sessionId = session_id || result.session_id;
+    const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
+
+    await (prisma as any).aISession.upsert({
+      where: { sessionId },
+      update: { metadata: merged, type: 'director' },
+      create: {
+        userId,
+        sessionId,
+        type: 'director',
+        metadata: merged
+      }
+    });
+
+    return res.json({ success: true, data: { ...result, history: finalHistory } });
+  } catch (error: any) {
+    console.error('[AIDirectorController] Chat Error:', error);
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
