@@ -7,8 +7,10 @@ import { AuthRequest } from '../../middleware/auth';
 
 export const generateImages = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const { session_id } = req.body;
+    const { session_id, brief } = req.body;
     const userId = req.user?.id;
+    const businessName = brief?.business_name;
+
 
     if (session_id && userId) {
       const session = await (prisma as any).aISession.findUnique({
@@ -81,6 +83,7 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
             create: {
               userId,
               sessionId: finalSessionId,
+              tag: businessName || null,
               type: 'image-lead',
               metadata: {
                 mainImageUrl: mainImageUrl,
@@ -89,6 +92,7 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
               }
             },
             update: {
+              tag: businessName || undefined,
               metadata: {
                 mainImageUrl: mainImageUrl,
                 scenes: scenes,
