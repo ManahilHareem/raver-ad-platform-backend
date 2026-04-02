@@ -11,7 +11,13 @@ export const deleteSession = async (sessionId: string) => {
   try {
     // We use deleteMany to avoid throwing an error if the session was already deleted
     const result = await (prisma as any).aISession.deleteMany({
-      where: { campaignId: sessionId }
+      where: {
+        OR: [
+          { sessionId: sessionId },
+          { campaignId: sessionId },
+          { sessionId: { startsWith: sessionId + '_' } } // Support versioned session IDs
+        ]
+      }
     });
     return { 
       success: true, 

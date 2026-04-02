@@ -140,15 +140,34 @@ export const getSession = async (req: AuthRequest, res: Response): Promise<any> 
     const result = await directorService.getSession(cleanId as string);
 
     if (userId && session_id) {
+      const isMissing = result.message?.includes('No active campaign') || (result.status === null && result.campaign_id === null);
+      if (isMissing) {
+        return res.json({ success: true, data: result });
+      }
+
+      const local = await (prisma as any).aISession.findUnique({ where: { sessionId: session_id as string } });
       const merged = mergeMetadata(null, result);
+      
+      // Ensure the metadata reflects our versioned ID, not the base ID from the service
+      merged.session_id = session_id;
+      
+      // If the proxy doesn't report ready, we assume it's still in production
+      if (result.status !== 'ready_for_human_review') {
+        merged.production = merged.production || {};
+        merged.production.status = 'in_production';
+      }
+
+      const campaignIdToSave = result.campaign_id || (typeof session_id === 'string' && !session_id.includes('_') ? session_id : (local?.campaignId || null));
+
       await (prisma as any).aISession.upsert({
         where: { sessionId: session_id as string },
-        update: { metadata: merged, userId },
+        update: { metadata: merged, userId, campaignId: campaignIdToSave },
         create: {
           userId,
           sessionId: session_id as string,
           type: 'director',
-          metadata: merged
+          metadata: merged,
+          campaignId: campaignIdToSave
         }
       });
     }
@@ -171,21 +190,38 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
 
     // 2. Conditional Persistence: Only save to DB if it's ready for review (Production complete)
     // As per user request: "if it is 'ready_for_human_review' than add it to db"
-    if (userId && session_id && result.status === 'ready_for_human_review') {
+    if (userId && session_id) {
+      const isMissing = result.message?.includes('No active campaign') || (result.status === null && result.campaign_id === null);
+      if (isMissing) {
+        return res.json({ success: true, data: result });
+      }
+
       const existing = await (prisma as any).aISession.findUnique({ where: { sessionId: session_id as string } });
       const merged = mergeMetadata(existing?.metadata, result);
+      
+      // Ensure the metadata reflects our versioned ID, not the base ID from the service
+      merged.session_id = session_id;
+
+      // Force production status if the campaign is not yet finalized
+      if (result.status !== 'ready_for_human_review') {
+        merged.production = merged.production || {};
+        merged.production.status = 'in_production';
+      }
+
+      const campaignIdToSave = result.campaign_id || (typeof session_id === 'string' && !session_id.includes('_') ? session_id : (existing?.campaignId || null));
 
       await (prisma as any).aISession.upsert({
         where: { sessionId: session_id as string },
-        update: { metadata: merged, userId },
+        update: { metadata: merged, userId, campaignId: campaignIdToSave },
         create: {
           userId,
           sessionId: session_id as string,
           type: 'director',
-          metadata: merged
+          metadata: merged,
+          campaignId: campaignIdToSave
         }
       });
-      console.log(`[AIDirector] Session ${session_id} finalized in local database.`);
+      console.log(`[AIDirector] Session ${session_id} updated in local database.`);
     }
 
     // Always return the live proxy result to the frontend (even if not finalized)
@@ -252,7 +288,12 @@ export const deleteSession = async (req: AuthRequest, res: Response): Promise<an
     }
 
     const localSession = await (prisma as any).aISession.findFirst({
-      where: { campaignId: session_id as string }
+      where: {
+        OR: [
+          { sessionId: session_id as string },
+          { campaignId: session_id as string }
+        ]
+      }
     });
 
     if (localSession && localSession.userId !== userId) {

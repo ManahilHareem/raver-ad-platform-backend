@@ -75,10 +75,33 @@ export const updateCampaign = async (id: string, data: any) => {
 export const deleteCampaign = async (id: string) => {
   if (!isValidUuid(id)) throw new Error('Invalid Campaign ID format');
   try {
+    // 1. Manually clean up associated records that don't have automatic Cascade Delete
+    
+    // Delete metrics (Prisma should handle this, but being explicit doesn't hurt)
+    await prisma.metric.deleteMany({ where: { campaignId: id } });
+
+    // Delete associated assets
+    await prisma.asset.deleteMany({ where: { campaignId: id } });
+
+    // Delete image lead results
+    await prisma.imageLeadResult.deleteMany({ where: { campaignId: id } });
+
+    // Delete AI Director session history (critical for clearing the sessions dashboard)
+    await (prisma as any).aISession.deleteMany({
+      where: {
+        OR: [
+          { campaignId: id },
+          { sessionId: id },
+          { sessionId: { startsWith: id } }
+        ]
+      }
+    });
+
+    // 2. Finally, delete the campaign itself
     return await prisma.campaign.deleteMany({
       where: { id }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error deleting campaign ID (${id}):`, error);
     throw new Error('Campaign deletion failed.');
   }

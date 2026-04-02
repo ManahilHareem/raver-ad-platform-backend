@@ -65,6 +65,13 @@ export const getCampaign = async (req: AuthRequest, res: Response): Promise<any>
     
     // 2. Sync to local DB
     if (userId && result.campaign_id) {
+        // Guard against persistence of a "missing" campaign response
+        const isMissing = result.message?.includes('No active campaign') || (result.status === null && result.campaign_id === null);
+        if (isMissing) {
+            console.log(`[AIProducerController] Skipping persistence for inactive campaign ${campaign_id}`);
+            return res.json({ success: true, data: result });
+        }
+
         try {
             await (prisma as any).campaign.upsert({
                 where: { id: result.campaign_id },
