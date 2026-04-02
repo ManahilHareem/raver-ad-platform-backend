@@ -23,10 +23,30 @@ const mergeMetadata = (existing: any, incoming: any) => {
   };
 };
 
+const voiceOptions = [
+  "adam", "arnold", "callum", "clyde", "daniel", "george", "james", "joseph", "liam", "michael",
+  "antoni", "charlie", "drew", "ethan", "fin", "harry", "jeremy", "josh", "patrick", "sam", "thomas",
+  "charlotte", "domi", "dorothy", "emily", "rachel", "sarah", "alice", "matilda",
+  "elli", "freya", "gigi", "grace", "jessica", "lily", "nicole"
+];
+
+const detectVoice = (message: string): string | null => {
+  if (!message) return null;
+  const lowerMsg = message.toLowerCase();
+  for (const voice of voiceOptions) {
+    const regex = new RegExp(`\\b${voice}\\b`, 'i');
+    if (regex.test(lowerMsg)) {
+      return voice;
+    }
+  }
+  return null;
+};
+
 export const chat = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const userId = req.user?.id;
-    const { session_id, message } = req.body;
+    const { session_id, campaign_id, message } = req.body;
+    const lookupId = session_id || campaign_id;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -35,8 +55,8 @@ export const chat = async (req: AuthRequest, res: Response): Promise<any> => {
     // 1. Load context from DB if it's an existing session
     let existingHistory: any[] = [];
     let existingMetadata: any = {};
-    if (session_id) {
-      const session = await (prisma as any).aISession.findUnique({ where: { sessionId: session_id } });
+    if (lookupId) {
+      const session = await (prisma as any).aISession.findUnique({ where: { sessionId: lookupId } });
       if (session) {
         existingMetadata = session.metadata || {};
         existingHistory = Array.isArray(existingMetadata.history) ? existingMetadata.history : [];
@@ -62,19 +82,23 @@ export const chat = async (req: AuthRequest, res: Response): Promise<any> => {
     const finalHistory = [...updatedHistory, assistantMessage];
 
     // 5. Persist to DB (Source of Truth for Conversation)
-    const sessionId = session_id || result.session_id;
-    const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
+    const finalId = lookupId || result.session_id;
+    const campaignIdToSave = campaign_id || result.campaign_id;
 
-    await (prisma as any).aISession.upsert({
-      where: { sessionId },
-      update: { metadata: merged, type: 'director' },
-      create: {
-        userId,
-        sessionId,
-        type: 'director',
-        metadata: merged
-      }
-    });
+    if (finalId) {
+      const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
+      await (prisma as any).aISession.upsert({
+        where: { sessionId: finalId },
+        update: { metadata: merged, type: 'director', campaignId: campaignIdToSave },
+        create: {
+          userId,
+          sessionId: finalId,
+          type: 'director',
+          metadata: merged,
+          campaignId: campaignIdToSave
+        }
+      });
+    }
 
     return res.json({ success: true, data: { ...result, history: finalHistory } });
   } catch (error: any) {
@@ -183,7 +207,19 @@ export const listSessions = async (req: AuthRequest, res: Response): Promise<any
       orderBy: { createdAt: 'desc' }
     });
 
-    const formatted = sessions.map((s: any) => {
+    // Deduplicate by campaignId (checking column, metadata, or sessionId prefix)
+    // Only shows the latest session for each unique campaign/conversation
+    const deduplicated = sessions.reduce((acc: any, current: any) => {
+      const metadata = (current.metadata as any) || {};
+      const groupKey = current.campaignId || metadata.campaign_id || current.sessionId.split('_')[0];
+      
+      if (!acc[groupKey] || new Date(current.createdAt) > new Date(acc[groupKey].createdAt)) {
+        acc[groupKey] = current;
+      }
+      return acc;
+    }, {});
+
+    const formatted = Object.values(deduplicated).map((s: any) => {
       const metadata = (s.metadata as any) || {};
       const history = metadata.history || [];
       const prompt = history.find((m: any) => m.role === 'user')?.content || '';
@@ -191,6 +227,7 @@ export const listSessions = async (req: AuthRequest, res: Response): Promise<any
       return {
         ...metadata,
         session_id: s.sessionId,
+        campaign_id: s.campaignId || metadata.campaign_id,
         created_at: s.createdAt,
         prompt
       };
@@ -211,27 +248,18 @@ export const deleteSession = async (req: AuthRequest, res: Response): Promise<an
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const localSession = await (prisma as any).aISession.findUnique({
-      where: { sessionId: session_id as string }
-    });
+ const localSession = await (prisma as any).aISession.findFirst({
+  where: { campaignId: session_id as string }
+});
 
     if (localSession && localSession.userId !== userId) {
       return res.status(403).json({ success: false, message: 'Unauthorized to delete this session.' });
     }
 
-    if (localSession) {
-      await (prisma as any).aISession.delete({
-        where: { sessionId: session_id as string }
-      });
-    }
-
+    // The service now handles the database deletion using deleteMany for safety
     const result = await directorService.deleteSession(session_id as string);
 
-    return res.json({
-      success: true,
-      message: 'Session deleted successfully',
-      data: result
-    });
+    return res.json(result);
   } catch (error: any) {
     console.error('[AIDirectorController] Error deleting session:', error);
     return res.status(error.status || 500).json({
@@ -244,7 +272,8 @@ export const deleteSession = async (req: AuthRequest, res: Response): Promise<an
 export const regenerateChat = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const userId = req.user?.id;
-    const { session_id, message } = req.body;
+    const { session_id, campaign_id, message } = req.body;
+    const lookupId = session_id || campaign_id;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -253,8 +282,8 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     // 1. Load context from DB if it's an existing session
     let existingHistory: any[] = [];
     let existingMetadata: any = {};
-    if (session_id) {
-      const session = await (prisma as any).aISession.findUnique({ where: { sessionId: session_id } });
+    if (lookupId) {
+      const session = await (prisma as any).aISession.findUnique({ where: { sessionId: lookupId } });
       if (session) {
         existingMetadata = session.metadata || {};
         existingHistory = Array.isArray(existingMetadata.history) ? existingMetadata.history : [];
@@ -272,6 +301,15 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     };
     const result = await directorService.regenerateChat(aiRequestPayload);
 
+    // Capture explicit parameter overrides like voice from the newest user text
+    // (If we check change_notes, it might detect old, overwritten voices due to string accumulation)
+    const detectedVoice = detectVoice(userMessage.content);
+    if (detectedVoice) {
+      if (!result.brief_draft) result.brief_draft = {};
+      result.brief_draft.voice = detectedVoice;
+      result.voice = detectedVoice; 
+    }
+
     // 4. Append Assistant Message
     const assistantMessage = {
       role: 'assistant',
@@ -280,19 +318,33 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     const finalHistory = [...updatedHistory, assistantMessage];
 
     // 5. Persist to DB (Source of Truth for Conversation)
-    const sessionId = session_id || result.session_id;
-    const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
+    // To "maintain the previous", we save regenerations under a new ID if it would otherwise overwrite
+    const finalId = lookupId ? (result.session_id && result.session_id !== lookupId ? result.session_id : `${lookupId}_${Date.now()}`) : result.session_id;
+    const campaignIdToSave = campaign_id || result.campaign_id || (lookupId && !lookupId.includes('_') ? lookupId : null);
 
-    await (prisma as any).aISession.upsert({
-      where: { sessionId },
-      update: { metadata: merged, type: 'director' },
-      create: {
-        userId,
-        sessionId,
-        type: 'director',
-        metadata: merged
+    if (finalId) {
+      const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
+      
+      // Prevent UI from getting stuck if it inherits the old 'ready_for_human_review' status
+      if (result.campaign_status === 'in_production') {
+        merged.production = merged.production || {};
+        merged.production.status = 'in_production';
       }
-    });
+
+      await (prisma as any).aISession.upsert({
+        where: { sessionId: finalId },
+        update: { metadata: merged, type: 'director', campaignId: campaignIdToSave },
+        create: {
+          userId,
+          sessionId: finalId,
+          type: 'director',
+          metadata: merged,
+          campaignId: campaignIdToSave
+        }
+      });
+
+      return res.json({ success: true, data: merged });
+    }
 
     return res.json({ success: true, data: { ...result, history: finalHistory } });
   } catch (error: any) {

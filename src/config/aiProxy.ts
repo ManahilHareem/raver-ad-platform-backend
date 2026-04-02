@@ -14,6 +14,7 @@ export const proxyPost = async (path: string, body: any) => {
       headers: { 'Content-Type': 'application/json' },
       timeout: Number(process.env.API_TIMEOUT) || 600000, // 10 min timeout for long AI generation tasks
     });
+    console.log(`[AIProxy] Received successful response from ${path}:`, JSON.stringify(response.data, null, 2));
     return response.data;
   } catch (error) {
     const axiosErr = error as AxiosError;
@@ -35,6 +36,7 @@ export const proxyGet = async (path: string) => {
     const response = await axios.get(`${AI_BACKEND_URL}${path}`, {
       timeout: 30000,
     });
+    console.log(`[AIProxy] Received successful response from ${path}:`, JSON.stringify(response.data));
     return response.data;
   } catch (error) {
     const axiosErr = error as AxiosError;

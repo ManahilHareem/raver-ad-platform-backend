@@ -75,7 +75,7 @@ export const updateCampaign = async (id: string, data: any) => {
 export const deleteCampaign = async (id: string) => {
   if (!isValidUuid(id)) throw new Error('Invalid Campaign ID format');
   try {
-    return await prisma.campaign.delete({
+    return await prisma.campaign.deleteMany({
       where: { id }
     });
   } catch (error) {

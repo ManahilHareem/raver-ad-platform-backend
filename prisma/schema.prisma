@@ -7,14 +7,15 @@ datasource db {
 }
 
 model AISession {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String   @db.Uuid
-  sessionId String   @unique
-  tag       String?
-  type      String
-  metadata  Json?
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @db.Uuid
+  sessionId   String   @unique
+  campaignId  String?
+  tag         String?
+  type        String
+  metadata    Json?
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Agent {
