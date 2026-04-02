@@ -126,17 +126,18 @@ export const getSession = async (req: AuthRequest, res: Response): Promise<any> 
       const metadata = (local.metadata as any) || {};
       const history = metadata.history || [];
       const prompt = history.find((m: any) => m.role === 'user')?.content || '';
-      
-      return res.json({ 
-        success: true, 
+
+      return res.json({
+        success: true,
         data: {
           ...metadata,
           prompt
-        } 
+        }
       });
     }
 
-    const result = await directorService.getSession(session_id as string);
+    const cleanId = (session_id as string).includes('_') ? (session_id as string).split('_')[0] : session_id;
+    const result = await directorService.getSession(cleanId as string);
 
     if (userId && session_id) {
       const merged = mergeMetadata(null, result);
@@ -164,7 +165,9 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
     const userId = req.user?.id;
 
     // 1. Fetch latest state from AI Proxy
-    const result = await directorService.getUpdate(session_id as string);
+    // If it's a versioned session (has _timestamp), we strip the suffix for the external proxy
+    const cleanId = (session_id as string).includes('_') ? (session_id as string).split('_')[0] : session_id;
+    const result = await directorService.getUpdate(cleanId as string);
 
     // 2. Conditional Persistence: Only save to DB if it's ready for review (Production complete)
     // As per user request: "if it is 'ready_for_human_review' than add it to db"
@@ -212,7 +215,7 @@ export const listSessions = async (req: AuthRequest, res: Response): Promise<any
     const deduplicated = sessions.reduce((acc: any, current: any) => {
       const metadata = (current.metadata as any) || {};
       const groupKey = current.campaignId || metadata.campaign_id || current.sessionId.split('_')[0];
-      
+
       if (!acc[groupKey] || new Date(current.createdAt) > new Date(acc[groupKey].createdAt)) {
         acc[groupKey] = current;
       }
@@ -248,9 +251,9 @@ export const deleteSession = async (req: AuthRequest, res: Response): Promise<an
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
- const localSession = await (prisma as any).aISession.findFirst({
-  where: { campaignId: session_id as string }
-});
+    const localSession = await (prisma as any).aISession.findFirst({
+      where: { campaignId: session_id as string }
+    });
 
     if (localSession && localSession.userId !== userId) {
       return res.status(403).json({ success: false, message: 'Unauthorized to delete this session.' });
@@ -307,7 +310,7 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     if (detectedVoice) {
       if (!result.brief_draft) result.brief_draft = {};
       result.brief_draft.voice = detectedVoice;
-      result.voice = detectedVoice; 
+      result.voice = detectedVoice;
     }
 
     // 4. Append Assistant Message
@@ -322,11 +325,15 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     const finalId = lookupId ? (result.session_id && result.session_id !== lookupId ? result.session_id : `${lookupId}_${Date.now()}`) : result.session_id;
     const campaignIdToSave = campaign_id || result.campaign_id || (lookupId && !lookupId.includes('_') ? lookupId : null);
 
-    if (finalId) {
+    // Only save to the database if the AI backend actually accepted the regeneration request!
+    // We cannot just check 'campaign_status === in_production' because the backend still returns 'in_production' even when it throws an error.
+    const isRejected = typeof result.response === 'string' && result.response.includes("couldn't apply that revision right now");
+
+    if (finalId && !isRejected) {
       const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
-      
+
       // Prevent UI from getting stuck if it inherits the old 'ready_for_human_review' status
-      if (result.campaign_status === 'in_production') {
+      if (result.campaign_status === 'in_production' || merged.production?.status === 'in_production') {
         merged.production = merged.production || {};
         merged.production.status = 'in_production';
       }
