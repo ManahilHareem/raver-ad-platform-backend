@@ -368,10 +368,8 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     };
     const finalHistory = [...updatedHistory, assistantMessage];
 
-    // 5. Update the SAME session in DB — no new records, just update in place
-    const isRejected = typeof result.response === 'string' && result.response.includes("couldn't apply that revision right now");
-
-    if (!isRejected && existingSession) {
+    // 5. Update the SAME session in DB — always persist history and status
+    if (existingSession) {
       const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
 
       // Force status to 'in_production' since we just triggered a regeneration
