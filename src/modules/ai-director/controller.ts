@@ -316,20 +316,26 @@ export const deleteSession = async (req: AuthRequest, res: Response): Promise<an
 export const regenerateChat = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const userId = req.user?.id;
-    const { session_id, campaign_id, message } = req.body;
-    const lookupId = session_id || campaign_id;
+    const { session_id, message } = req.body;
+    const lookupId = session_id ;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    // 1. Load context from DB if it's an existing session
+    // 1. Load the existing session from DB using campaignId
+    //    session_id from request = campaignId in DB
     let existingHistory: any[] = [];
     let existingMetadata: any = {};
+    let existingSession: any = null;
     if (lookupId) {
-      const session = await (prisma as any).aISession.findUnique({ where: { sessionId: lookupId } });
-      if (session) {
-        existingMetadata = session.metadata || {};
+      existingSession = await (prisma as any).aISession.findFirst({
+        where: { campaignId: lookupId, type: 'director' },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (existingSession) {
+        existingMetadata = existingSession.metadata || {};
         existingHistory = Array.isArray(existingMetadata.history) ? existingMetadata.history : [];
       }
     }
@@ -340,13 +346,14 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
 
     // 3. Request AI response
     const aiRequestPayload = {
-      ...req.body,
+      message,
+      session_id: existingSession?.sessionId,
+      campaign_id: existingSession?.campaignId,
       history: updatedHistory
     };
     const result = await directorService.regenerateChat(aiRequestPayload);
 
     // Capture explicit parameter overrides like voice from the newest user text
-    // (If we check change_notes, it might detect old, overwritten voices due to string accumulation)
     const detectedVoice = detectVoice(userMessage.content);
     if (detectedVoice) {
       if (!result.brief_draft) result.brief_draft = {};
@@ -361,34 +368,21 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     };
     const finalHistory = [...updatedHistory, assistantMessage];
 
-    // 5. Persist to DB (Source of Truth for Conversation)
-    // To "maintain the previous", we save regenerations under a new ID if it would otherwise overwrite
-    const finalId = lookupId ? (result.session_id && result.session_id !== lookupId ? result.session_id : `${lookupId}_${Date.now()}`) : result.session_id;
-    const campaignIdToSave = campaign_id || result.campaign_id || (lookupId && !lookupId.includes('_') ? lookupId : null);
-
-    // Only save to the database if the AI backend actually accepted the regeneration request!
-    // We cannot just check 'campaign_status === in_production' because the backend still returns 'in_production' even when it throws an error.
+    // 5. Update the SAME session in DB — no new records, just update in place
     const isRejected = typeof result.response === 'string' && result.response.includes("couldn't apply that revision right now");
 
-    if (finalId && !isRejected) {
+    if (!isRejected && existingSession) {
       const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
 
-      // Prevent UI from getting stuck if it inherits the old 'ready_for_human_review' status
-      if (result.campaign_status === 'in_production' || merged.production?.status === 'in_production') {
-        merged.production = merged.production || {};
-        merged.production.status = 'in_production';
-      }
+      // Force status to 'in_production' since we just triggered a regeneration
+      merged.production = merged.production || {};
+      merged.production.status = 'in_production';
+      merged.campaign_status = 'in_production';
+      merged.status = 'in_production';
 
-      await (prisma as any).aISession.upsert({
-        where: { sessionId: finalId },
-        update: { metadata: merged, type: 'director', campaignId: campaignIdToSave },
-        create: {
-          userId,
-          sessionId: finalId,
-          type: 'director',
-          metadata: merged,
-          campaignId: campaignIdToSave
-        }
+      await (prisma as any).aISession.update({
+        where: { sessionId: existingSession.sessionId },
+        data: { metadata: merged }
       });
 
       return res.json({ success: true, data: merged });

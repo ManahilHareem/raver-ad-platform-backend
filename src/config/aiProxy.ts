@@ -8,6 +8,7 @@ const BASE_URL = (process.env.AI_BACKEND_URL || 'https://apiplatform.raver.ai').
  */
 export const proxyPost = async (path: string, body: any) => {
   const fullUrl = `${BASE_URL}${path}`;
+  console.log(`[AIProxy] Forwarding POST request to ${fullUrl} with body:`, JSON.stringify(body, null, 2));
   try {
     const payload = body || {}; // Ensure we always send at least an empty object if undefined
     console.log(`[AIProxy] Forwarding POST request to ${fullUrl} with body:`, JSON.stringify(payload, null, 2));
