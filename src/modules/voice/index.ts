@@ -24,4 +24,24 @@ const router = Router();
  */
 router.get('/get-voices', Controller.getVoices);
 
+/**
+ * @swagger
+ * /api/voice/get-voice/{voice_id}:
+ *   get:
+ *     summary: Retrieve details of a specific voice from Eleven Labs
+ *     tags: [Voice]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: voice_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Voice details
+ */
+router.get('/get-voice/:voice_id', Controller.getVoiceById);
+
 export default router;

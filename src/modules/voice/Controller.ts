@@ -15,4 +15,21 @@ export const getVoices = async (req: Request, res: Response) => {
       message: error.message || 'Internal Server Error',
     });
   }
-};  
+};
+
+export const getVoiceById = async (req: Request, res: Response) => {
+  try {
+    const { voice_id } = req.params;
+    const voice = await ElevenLabsService.fetchElevenLabsVoice(voice_id as string);
+    
+    return res.status(200).json({
+      success: true,
+      data: voice,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Internal Server Error',
+    });
+  }
+};

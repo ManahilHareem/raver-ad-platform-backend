@@ -17,3 +17,19 @@ export const fetchElevenLabsVoices = async () => {
     throw new Error('Failed to retrieve voices from ElevenLabs.');
   }
 };
+
+export const fetchElevenLabsVoice = async (voiceId: string) => {
+  try {
+    const response = await axios.get(`${ELEVEN_LABS_API_URL}/${voiceId}`, {
+      headers: {
+        'Accept': 'application/json',
+        'xi-api-key': process.env.ELEVEN_LABS_API_KEY,
+      },
+    });
+
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching voice from ElevenLabs:', error.message);
+    throw new Error('Failed to retrieve voice from ElevenLabs.');
+  }
+};
