@@ -107,6 +107,63 @@ export const chat = async (req: AuthRequest, res: Response): Promise<any> => {
   }
 };
 
+export const approveSession = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { session_id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    // 1. Sync to local DB
+    let result: any = { status: 'approved' };
+    if (session_id) {
+      const session = await (prisma as any).aISession.findUnique({
+        where: { sessionId: session_id as string }
+      });
+
+      if (session) {
+        if (session.userId !== userId) {
+          return res.status(403).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const merged = mergeMetadata(session.metadata, { 
+          status: 'approved',
+          production: { status: 'approved' }
+        });
+
+        // Update Session
+        const updatedSession = await (prisma as any).aISession.update({
+          where: { sessionId: session_id as string },
+          data: { metadata: merged }
+        });
+
+        // Update linked Campaign if exists
+        const campaignId = session.campaignId || (session.metadata as any)?.campaign_id;
+        if (campaignId) {
+          try {
+            await (prisma as any).campaign.updateMany({
+              where: { id: campaignId },
+              data: { status: 'approved' }
+            });
+          } catch (dbError) {
+            console.error('[AIDirectorController] Campaign status update failed:', dbError);
+          }
+        }
+        
+        result = updatedSession;
+      }
+    }
+
+    return res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[AIDirectorController] Approval Error:', error);
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+
 export const getSession = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { session_id } = req.params;

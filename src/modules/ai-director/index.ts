@@ -126,6 +126,26 @@ router.get('/session/:session_id/update', controller.getUpdate);
 
 /**
  * @swagger
+ * /api/ai/director/session/{session_id}/approve:
+ *   patch:
+ *     summary: Approve an AI Director session result
+ *     tags: [AI Director]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: session_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Session approved successfully
+ */
+router.patch('/session/:session_id/approve', controller.approveSession);
+
+/**
+ * @swagger
  * /api/ai/director/session/{session_id}:
  *   delete:
  *     summary: Delete an AI Director session
