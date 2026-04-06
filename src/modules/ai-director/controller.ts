@@ -111,7 +111,7 @@ export const approveSession = async (req: AuthRequest, res: Response): Promise<a
   try {
     const { session_id } = req.params;
     const userId = req.user?.id;
-
+    console.log("req.body", req.body);
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
@@ -194,16 +194,33 @@ export const getSession = async (req: AuthRequest, res: Response): Promise<any> 
     }
 
     const cleanId = (session_id as string).includes('_') ? (session_id as string).split('_')[0] : session_id;
-    const result = await directorService.getSession(cleanId as string);
+    let result: any;
+    try {
+      result = await directorService.getSession(cleanId as string);
+    } catch (proxyError: any) {
+      console.warn(`[AIDirector] Proxy session fetch failed for ${session_id}, returning local data.`);
+      if (local) {
+        const metadata = (local.metadata as any) || {};
+        const history = metadata.history || [];
+        const prompt = history.find((m: any) => m.role === 'user')?.content || '';
+        return res.json({ success: true, data: { ...metadata, prompt } });
+      }
+      throw proxyError;
+    }
 
     if (userId && session_id) {
       const isMissing = result.message?.includes('No active campaign') || (result.status === null && result.campaign_id === null);
       if (isMissing) {
+        if (local) {
+          const metadata = (local.metadata as any) || {};
+          const history = metadata.history || [];
+          const prompt = history.find((m: any) => m.role === 'user')?.content || '';
+          return res.json({ success: true, data: { ...metadata, prompt } });
+        }
         return res.json({ success: true, data: result });
       }
 
-      const local = await (prisma as any).aISession.findUnique({ where: { sessionId: session_id as string } });
-      const merged = mergeMetadata(null, result);
+      const merged = mergeMetadata(local?.metadata, result);
       
       // Ensure the metadata reflects our versioned ID, not the base ID from the service
       merged.session_id = session_id;
@@ -240,26 +257,59 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
     const { session_id } = req.params;
     const userId = req.user?.id;
 
-    // 1. Fetch latest state from AI Proxy
-    // If it's a versioned session (has _timestamp), we strip the suffix for the external proxy
-    const cleanId = (session_id as string).includes('_') ? (session_id as string).split('_')[0] : session_id;
-    const result = await directorService.getUpdate(cleanId as string);
+    if (!session_id) {
+      return res.status(400).json({ success: false, message: 'Session ID is required' });
+    }
 
-    // 2. Conditional Persistence: Only save to DB if it's ready for review (Production complete)
-    // As per user request: "if it is 'ready_for_human_review' than add it to db"
+    // 1. Check local DB first for existing data (Avoid proxy if already terminal)
+    const local = await (prisma as any).aISession.findUnique({ where: { sessionId: session_id as string } });
+    if (local) {
+      if (userId && local.userId !== userId) {
+        return res.status(403).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const metadata = (local.metadata as any) || {};
+      const status = metadata.status || metadata.production?.status || (metadata.campaign_status);
+      
+      // If already approved or ready, return local state without redundant proxy hit
+      if (status === 'approved' || status === 'ready_for_human_review') {
+        return res.json({ 
+          success: true, 
+          data: { 
+            ...metadata, 
+            session_id: local.sessionId, 
+            campaign_id: local.campaignId,
+            status: status 
+          } 
+        });
+      }
+    }
+
+    // 2. Fetch latest state from AI Proxy
+    const cleanId = (session_id as string).includes('_') ? (session_id as string).split('_')[0] : session_id;
+    let result: any;
+    try {
+      result = await directorService.getUpdate(cleanId as string);
+    } catch (proxyError: any) {
+      console.warn(`[AIDirector] Proxy call failed for ${session_id}, returning local data.`);
+      if (local) return res.json({ success: true, data: local.metadata });
+      throw proxyError;
+    }
+
+    // 3. Conditional Persistence: Only save to DB if it's ready for review (Production complete)
     if (userId && session_id) {
       const isMissing = result.message?.includes('No active campaign') || (result.status === null && result.campaign_id === null);
       if (isMissing) {
+        // If proxy doesn't see it but we do, return local. Otherwise return proxy message.
+        if (local) return res.json({ success: true, data: local.metadata });
         return res.json({ success: true, data: result });
       }
 
-      const existing = await (prisma as any).aISession.findUnique({ where: { sessionId: session_id as string } });
+      const existing = local || await (prisma as any).aISession.findUnique({ where: { sessionId: session_id as string } });
       const merged = mergeMetadata(existing?.metadata, result);
       
-      // Ensure the metadata reflects our versioned ID, not the base ID from the service
       merged.session_id = session_id;
 
-      // Force production status if the campaign is not yet finalized
       if (result.status !== 'ready_for_human_review') {
         merged.production = merged.production || {};
         merged.production.status = 'in_production';
@@ -278,10 +328,8 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
           campaignId: campaignIdToSave
         }
       });
-      console.log(`[AIDirector] Session ${session_id} updated in local database.`);
     }
 
-    // Always return the live proxy result to the frontend (even if not finalized)
     return res.json({ success: true, data: result });
   } catch (error: any) {
     return res.status(error.status || 500).json({ success: false, message: error.message });

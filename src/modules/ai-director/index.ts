@@ -38,13 +38,11 @@ const router = Router();
  */
 router.post('/chat', controller.chat);
 
-
-
 /**
  * @swagger
- * /api/ai/director/chat:
+ * /api/ai/director/regenerate-chat:
  *   post:
- *     summary: Send a message to the Raver Director AI
+ *     summary: Regenerate a campaign with optional overrides
  *     tags: [AI Director]
  *     security:
  *       - bearerAuth: []
@@ -60,15 +58,15 @@ router.post('/chat', controller.chat);
  *                 type: string
  *               message:
  *                 type: string
- *               professional_name:
+ *               musicPrompt:
+ *                 type: string
+ *               voice_id:
  *                 type: string
  *     responses:
  *       200:
- *         description: Director response
+ *         description: Regeneration triggered
  */
 router.post('/regenerate-chat', controller.regenerateChat);
-
-
 
 /**
  * @swagger
@@ -128,7 +126,7 @@ router.get('/session/:session_id/update', controller.getUpdate);
  * @swagger
  * /api/ai/director/session/{session_id}/approve:
  *   patch:
- *     summary: Approve an AI Director session result
+ *     summary: Approve an AI Director session result locally
  *     tags: [AI Director]
  *     security:
  *       - bearerAuth: []
@@ -165,4 +163,3 @@ router.patch('/session/:session_id/approve', controller.approveSession);
 router.delete('/session/:session_id', controller.deleteSession);
 
 export default router;
-
