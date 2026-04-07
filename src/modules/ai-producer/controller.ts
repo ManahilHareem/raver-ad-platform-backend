@@ -30,40 +30,6 @@ export const launchCampaign = async (req: AuthRequest, res: Response): Promise<a
       } catch (dbError) {
         console.error('[AIProducerController] ProducerResult persistence error:', dbError);
       }
-
-      // 2. Persist to high-level Campaign table for dashboard visibility
-      try {
-        await (prisma as any).campaign.upsert({
-          where: { id: result.campaign_id },
-          create: {
-            id: result.campaign_id,
-            userId,
-            name: req.body.brief?.business_name || 'AI Campaign',
-            status: result.status || 'queued',
-            audience: req.body.brief?.target_audience,
-            format: req.body.brief?.format,
-            platforms: req.body.brief?.platform ? [req.body.brief.platform] : [],
-            tones: req.body.brief?.tone ? [req.body.brief.tone] : [],
-            visualStyles: req.body.brief?.mood ? [req.body.brief.mood] : [],
-            config: {
-              brief: req.body.brief,
-              session_id: req.body.session_id
-            }
-          },
-          update: {
-            status: result.status || 'queued',
-            name: req.body.brief?.business_name || undefined,
-            audience: req.body.brief?.target_audience,
-            format: req.body.brief?.format,
-            platforms: req.body.brief?.platform ? [req.body.brief.platform] : [],
-            tones: req.body.brief?.tone ? [req.body.brief.tone] : [],
-            visualStyles: req.body.brief?.mood ? [req.body.brief.mood] : []
-          }
-        });
-        console.log(`[AIProducerController] Persisted campaign ${result.campaign_id} to DB`);
-      } catch (dbError) {
-        console.error('[AIProducerController] Campaign persistence error:', dbError);
-      }
     } else {
       console.warn('[AIProducerController] Skipping persistence: No valid campaign_id returned from AI.');
     }
@@ -153,9 +119,7 @@ export const listCampaigns = async (req: AuthRequest, res: Response): Promise<an
     const campaigns = await (prisma as any).campaign.findMany({
       where: { userId },
       include: { 
-        metrics: true,
-        ProducerResult: true,
-        ImageLeadResult: true
+        metrics: true
       },
       orderBy: { createdAt: 'desc' }
     });

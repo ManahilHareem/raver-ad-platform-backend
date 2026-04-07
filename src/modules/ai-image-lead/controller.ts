@@ -56,59 +56,33 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
 
       // Guard: Only save if we have a valid session ID and some content
       if (userId && finalSessionId && (scenes.length > 0 || mainImageUrl)) {
-        // 1. Sync to high-level Campaign table first (Parent)
-        try {
-          await (prisma as any).campaign.upsert({
-            where: { id: finalSessionId },
-            create: {
-              id: finalSessionId,
-              userId,
-              name: req.body.brief?.business_name || 'AI Image Campaign',
-              status: result.status || 'in_production',
-              audience: req.body.brief?.target_audience,
-              format: req.body.brief?.format,
-              platforms: req.body.brief?.platform ? [req.body.brief.platform] : [],
-              tones: req.body.brief?.brand_tone ? [req.body.brief.brand_tone] : [],
-              visualStyles: req.body.brief?.mood ? [req.body.brief.mood] : [],
-              config: { brief: req.body.brief, session_id: finalSessionId }
-            },
-            update: {
-              name: req.body.brief?.business_name || undefined,
-              status: result.status || 'in_production',
-              audience: req.body.brief?.target_audience,
-              format: req.body.brief?.format,
-              platforms: req.body.brief?.platform ? [req.body.brief.platform] : [],
-              tones: req.body.brief?.brand_tone ? [req.body.brief.brand_tone] : [],
-              visualStyles: req.body.brief?.mood ? [req.body.brief.mood] : []
-            }
-          });
-          console.log(`[ImageLeadController] Synced campaign "${req.body.brief?.business_name || finalSessionId}"`);
-        } catch (e) {
-          console.error('[ImageLeadController] Failed to sync high-level Campaign:', e);
-        }
-
-        // 2. Sync to ImageLeadResult (Child)
         try {
           await (prisma as any).imageLeadResult.upsert({
             where: { sessionId: finalSessionId },
+            update: {
+              campaignId: finalSessionId,
+              mainImageUrl,
+              scenes,
+              metadata: {
+                ...((result as any).metadata || {}),
+                style_prompt: (result as any).style_prompt
+              }
+            },
             create: {
               userId,
               sessionId: finalSessionId,
               campaignId: finalSessionId,
-              mainImageUrl: mainImageUrl,
-              scenes: scenes,
-              metadata: { ...result, lastGeneratedAt: new Date().toISOString() }
-            },
-            update: {
-              campaignId: finalSessionId,
-              mainImageUrl: mainImageUrl,
-              scenes: scenes,
-              metadata: { ...result, lastGeneratedAt: new Date().toISOString() }
+              mainImageUrl,
+              scenes,
+              metadata: {
+                ...((result as any).metadata || {}),
+                style_prompt: (result as any).style_prompt
+              }
             }
           });
-          console.log(`[ImageLeadController] Saved generation results for session ${finalSessionId}`);
-        } catch (e) {
-          console.error('[ImageLeadController] Failed to save imageLeadResult:', e);
+          console.log(`[ImageLeadController] Persisted local record for ${finalSessionId}`);
+        } catch (dbError) {
+          console.error('[ImageLeadController] ImageLeadResult persistence error:', dbError);
         }
       } else {
         console.warn(`[ImageLeadController] Skipping save for session ${finalSessionId || 'unknown'}: No content found.`);

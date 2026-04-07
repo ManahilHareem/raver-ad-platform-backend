@@ -73,11 +73,6 @@ model Campaign {
   Asset           Asset[]
   Project         Project?          @relation(fields: [projectId], references: [id])
   User            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ProducerResult    ProducerResult?
-  ImageLeadResult   ImageLeadResult[]
-  AudioLeadResult   AudioLeadResult[]
-  CopyLeadResult    CopyLeadResult[]
-  EditorResult      EditorResult[]
   metrics           Metric[]
 }
 
@@ -91,7 +86,6 @@ model ImageLeadResult {
   metadata     Json?
   createdAt    DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
-  Campaign     Campaign? @relation(fields: [campaignId], references: [id])
   User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -180,7 +174,6 @@ model ProducerResult {
   result       Json?
   createdAt    DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
-  Campaign     Campaign? @relation(fields: [campaignId], references: [id])
   User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -195,7 +188,6 @@ model AudioLeadResult {
   metadata     Json?
   createdAt    DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
-  Campaign     Campaign? @relation(fields: [campaignId], references: [id])
   User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -212,7 +204,6 @@ model CopyLeadResult {
   metadata     Json?
   createdAt    DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
-  Campaign     Campaign? @relation(fields: [campaignId], references: [id])
   User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -226,6 +217,5 @@ model EditorResult {
   metadata     Json?
   createdAt    DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
-  Campaign     Campaign? @relation(fields: [campaignId], references: [id])
   User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

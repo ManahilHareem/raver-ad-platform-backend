@@ -86,6 +86,12 @@ export const deleteCampaign = async (id: string) => {
     // Delete image lead results
     await prisma.imageLeadResult.deleteMany({ where: { campaignId: id } });
 
+    // Delete other agent results
+    await (prisma as any).producerResult.deleteMany({ where: { campaignId: id } });
+    await (prisma as any).audioLeadResult.deleteMany({ where: { campaignId: id } });
+    await (prisma as any).copyLeadResult.deleteMany({ where: { campaignId: id } });
+    await (prisma as any).editorResult.deleteMany({ where: { campaignId: id } });
+
     // Delete AI Director session history (critical for clearing the sessions dashboard)
     await (prisma as any).aISession.deleteMany({
       where: {
