@@ -20,10 +20,14 @@ export const renderCampaign = async (req: AuthRequest, res: Response): Promise<a
       };
       await (prisma as any).editorResult.upsert({
         where: { sessionId },
-        update: { metadata },
+        update: { 
+          campaignId: sessionId,
+          metadata 
+        },
         create: {
           userId,
           sessionId,
+          campaignId: sessionId,
           metadata
         }
       });
@@ -53,6 +57,7 @@ export const exportFormats = async (req: AuthRequest, res: Response): Promise<an
       await (prisma as any).editorResult.upsert({
         where: { sessionId },
         update: { 
+          campaignId: sessionId,
           videoUrl: exportUrl,
           format: format || result.format,
           metadata
@@ -60,6 +65,7 @@ export const exportFormats = async (req: AuthRequest, res: Response): Promise<an
         create: {
           userId,
           sessionId,
+          campaignId: sessionId,
           videoUrl: exportUrl,
           format: format || result.format,
           metadata

@@ -73,8 +73,12 @@ model Campaign {
   Asset           Asset[]
   Project         Project?          @relation(fields: [projectId], references: [id])
   User            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ImageLeadResult ImageLeadResult[]
-  metrics         Metric[]
+  ProducerResult    ProducerResult?
+  ImageLeadResult   ImageLeadResult[]
+  AudioLeadResult   AudioLeadResult[]
+  CopyLeadResult    CopyLeadResult[]
+  EditorResult      EditorResult[]
+  metrics           Metric[]
 }
 
 model ImageLeadResult {
@@ -158,63 +162,70 @@ model User {
   Billing           Billing?
   campaigns         Campaign[]
   imageLeadResults  ImageLeadResult[]
-  producerResults   ProducerResult[]
   audioLeadResults  AudioLeadResult[]
   copyLeadResults   CopyLeadResult[]
   editorResults     EditorResult[]
   paymentMethods    PaymentMethod[]
   projects          Project[]
+  producerResults   ProducerResult[]
 }
 
 model ProducerResult {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId       String   @db.Uuid
   sessionId    String?
-  campaignId   String   @unique
+  campaignId   String?   @unique @db.Uuid
   brief        Json?
   status       String?
   result       Json?
-  createdAt    DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime @default(now()) @db.Timestamptz(6)
-  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
+  Campaign     Campaign? @relation(fields: [campaignId], references: [id])
+  User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AudioLeadResult {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId       String   @db.Uuid
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @db.Uuid
   sessionId    String?
+  campaignId   String?   @db.Uuid
   musicUrl     String?
   voiceoverUrl String?
   mixUrl       String?
   metadata     Json?
-  createdAt    DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime @default(now()) @db.Timestamptz(6)
-  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
+  Campaign     Campaign? @relation(fields: [campaignId], references: [id])
+  User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model CopyLeadResult {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId       String   @db.Uuid
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @db.Uuid
   sessionId    String?
+  campaignId   String?   @db.Uuid
   script       Json?
   captions     Json?
   overlays     Json?
   cta          Json?
   hashtags     Json?
   metadata     Json?
-  createdAt    DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime @default(now()) @db.Timestamptz(6)
-  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
+  Campaign     Campaign? @relation(fields: [campaignId], references: [id])
+  User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model EditorResult {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId       String   @db.Uuid
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @db.Uuid
   sessionId    String?
+  campaignId   String?   @db.Uuid
   videoUrl     String?
   format       String?
   metadata     Json?
-  createdAt    DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime @default(now()) @db.Timestamptz(6)
-  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
+  Campaign     Campaign? @relation(fields: [campaignId], references: [id])
+  User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -13,12 +13,14 @@ export const generateMusic = async (req: AuthRequest, res: Response): Promise<an
       await (prisma as any).audioLeadResult.upsert({
         where: { sessionId: session_id },
         update: { 
+          campaignId: session_id,
           musicUrl: result.music_url,
           metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
+          campaignId: session_id,
           musicUrl: result.music_url,
           metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
         }
@@ -67,12 +69,14 @@ export const generateVoiceover = async (req: AuthRequest, res: Response): Promis
       await (prisma as any).audioLeadResult.upsert({
         where: { sessionId: session_id },
         update: { 
+          campaignId: session_id,
           voiceoverUrl: result.voiceover_url,
           metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
+          campaignId: session_id,
           voiceoverUrl: result.voiceover_url,
           metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
         }
@@ -112,12 +116,14 @@ export const produceAudio = async (req: AuthRequest, res: Response): Promise<any
       await (prisma as any).audioLeadResult.upsert({
         where: { sessionId: session_id },
         update: { 
+          campaignId: session_id,
           mixUrl: result.mix_url,
           metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
+          campaignId: session_id,
           mixUrl: result.mix_url,
           metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
         }
@@ -140,12 +146,14 @@ export const mixAudio = async (req: AuthRequest, res: Response): Promise<any> =>
       await (prisma as any).audioLeadResult.upsert({
         where: { sessionId: session_id },
         update: { 
+          campaignId: session_id,
           mixUrl: result.mix_url,
           metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
+          campaignId: session_id,
           mixUrl: result.mix_url,
           metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
         }

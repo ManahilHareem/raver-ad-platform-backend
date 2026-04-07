@@ -13,12 +13,14 @@ export const generateScript = async (req: AuthRequest, res: Response): Promise<a
       await (prisma as any).copyLeadResult.upsert({
         where: { sessionId: session_id },
         update: { 
+          campaignId: session_id,
           script: result,
           metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
+          campaignId: session_id,
           script: result,
           metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
         }
@@ -62,12 +64,14 @@ export const generateCaptions = async (req: AuthRequest, res: Response): Promise
       await (prisma as any).copyLeadResult.upsert({
         where: { sessionId: session_id },
         update: { 
+          campaignId: session_id,
           captions: result,
           metadata: { ...(Array.isArray(result) ? { captions_list: result } : result), lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
+          campaignId: session_id,
           captions: result,
           metadata: { ...(Array.isArray(result) ? { captions_list: result } : result), lastUpdatedAt: new Date().toISOString() }
         }
@@ -90,12 +94,14 @@ export const generateOverlays = async (req: AuthRequest, res: Response): Promise
       await (prisma as any).copyLeadResult.upsert({
         where: { sessionId: session_id },
         update: { 
+          campaignId: session_id,
           overlays: result,
           metadata: { ...(Array.isArray(result) ? { overlays_list: result } : result), lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
+          campaignId: session_id,
           overlays: result,
           metadata: { ...(Array.isArray(result) ? { overlays_list: result } : result), lastUpdatedAt: new Date().toISOString() }
         }
@@ -118,12 +124,14 @@ export const generateCta = async (req: AuthRequest, res: Response): Promise<any>
       await (prisma as any).copyLeadResult.upsert({
         where: { sessionId: session_id },
         update: { 
+          campaignId: session_id,
           cta: result,
           metadata: { ...(typeof result === 'object' ? result : { cta_text: result }), lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
+          campaignId: session_id,
           cta: result,
           metadata: { ...(typeof result === 'object' ? result : { cta_text: result }), lastUpdatedAt: new Date().toISOString() }
         }
@@ -146,12 +154,14 @@ export const generateHashtags = async (req: AuthRequest, res: Response): Promise
       await (prisma as any).copyLeadResult.upsert({
         where: { sessionId: session_id },
         update: { 
+          campaignId: session_id,
           hashtags: result,
           metadata: { ...(Array.isArray(result) ? { hashtags_list: result } : result), lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
+          campaignId: session_id,
           hashtags: result,
           metadata: { ...(Array.isArray(result) ? { hashtags_list: result } : result), lastUpdatedAt: new Date().toISOString() }
         }
@@ -173,10 +183,14 @@ export const produceCopy = async (req: AuthRequest, res: Response): Promise<any>
     if (userId && session_id && result && Object.keys(result).length > 0) {
       await (prisma as any).copyLeadResult.upsert({
         where: { sessionId: session_id },
-        update: { metadata: result },
+        update: { 
+          campaignId: session_id,
+          metadata: result 
+        },
         create: {
           userId,
           sessionId: session_id,
+          campaignId: session_id,
           metadata: result
         }
       });

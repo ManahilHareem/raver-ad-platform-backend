@@ -147,76 +147,16 @@ export const listCampaigns = async (req: AuthRequest, res: Response): Promise<an
         return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    // 1. Fetch from external Raver API to sync current user's campaigns
-    try {
-        const external = await producerService.listCampaigns();
-        const externalCampaigns = (external as any).campaigns || [];
-        
-        for (const ext of externalCampaigns) {
-            const brief = ext.brief || {};
-            const status = ext.status === 'completed' ? 'active' : (ext.status || 'draft');
-            
-            // Skip ghost campaigns (No ID or no content)
-            if (!ext.campaign_id || (!ext.brief && status === 'draft')) {
-                continue;
-            }
-
-            // Sync ProducerResult
-            try {
-                await (prisma as any).producerResult.upsert({
-                    where: { campaignId: ext.campaign_id },
-                    update: {
-                        userId,
-                        status: status,
-                        brief: brief,
-                        result: ext
-                    },
-                    create: {
-                        userId,
-                        campaignId: ext.campaign_id,
-                        status: status,
-                        brief: brief,
-                        result: ext
-                    }
-                });
-
-                // Sync Campaign
-                await (prisma as any).campaign.upsert({
-                    where: { id: ext.campaign_id },
-                    update: {
-                        userId,
-                        name: brief.business_name || 'AI Campaign',
-                        status: status,
-                        audience: brief.target_audience,
-                        format: brief.format,
-                        platforms: brief.platform ? [brief.platform] : [],
-                        tones: brief.tone ? [brief.tone] : [],
-                        visualStyles: brief.mood ? [brief.mood] : []
-                    },
-                    create: {
-                        id: ext.campaign_id,
-                        userId,
-                        name: brief.business_name || 'AI Campaign',
-                        status: status,
-                        audience: brief.target_audience,
-                        format: brief.format,
-                        platforms: brief.platform ? [brief.platform] : [],
-                        tones: brief.tone ? [brief.tone] : [],
-                        visualStyles: brief.mood ? [brief.mood] : []
-                    }
-                });
-            } catch (innerError) {
-                console.error(`[AIProducerController] Failed to sync campaign ${ext.campaign_id}:`, innerError);
-            }
-        }
-    } catch (syncError) {
-        console.error('[AIProducerController] Auto-sync failed:', syncError);
-    }
-
-    // 2. Fetch primary tracking records from local DB
+    // Fetch primary tracking records from local DB
+    // We rely on local Campaign table as the source of truth for the dashboard.
+    // Deletions are respected because we no longer blindly sync from Proxy on every list call.
     const campaigns = await (prisma as any).campaign.findMany({
       where: { userId },
-      include: { metrics: true },
+      include: { 
+        metrics: true,
+        ProducerResult: true,
+        ImageLeadResult: true
+      },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -289,17 +229,22 @@ export const deleteCampaign = async (req: AuthRequest, res: Response): Promise<a
 
     // 2. Perform deletions across all related tables
     try {
-      // Delete from ProducerResult
-      await (prisma as any).producerResult.deleteMany({
-        where: { campaignId: campaign_id, userId }
-      });
+      // 2a. Delete from Agent Result tables (Isolated data)
+      const where = { campaignId: campaign_id, userId };
+      
+      await (prisma as any).producerResult.deleteMany({ where });
+      await (prisma as any).imageLeadResult.deleteMany({ where });
+      await (prisma as any).audioLeadResult.deleteMany({ where });
+      await (prisma as any).copyLeadResult.deleteMany({ where });
+      await (prisma as any).editorResult.deleteMany({ where });
 
-      // Delete from AISession (Legacy or Director chats)
-      await (prisma as any).aISession.deleteMany({
-        where: { campaignId: campaign_id, userId }
-      });
+      // 2b. Delete from AISession (Legacy or Director chats)
+      await (prisma as any).aISession.deleteMany({ where });
 
-      // Delete high-level Campaign record
+      // 2c. Delete associated Assets (Optional but recommended for full cleanup)
+      await (prisma as any).asset.deleteMany({ where: { campaignId: campaign_id, userId } });
+
+      // 2d. Delete high-level Campaign record
       await (prisma as any).campaign.delete({
         where: { id: campaign_id }
       });

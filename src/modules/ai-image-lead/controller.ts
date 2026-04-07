@@ -63,11 +63,13 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
             create: {
               userId,
               sessionId: finalSessionId,
+              campaignId: finalSessionId, // Linking to Campaign UUID/String
               mainImageUrl: mainImageUrl,
               scenes: scenes,
               metadata: { ...result, lastGeneratedAt: new Date().toISOString() }
             },
             update: {
+              campaignId: finalSessionId,
               mainImageUrl: mainImageUrl,
               scenes: scenes,
               metadata: { ...result, lastGeneratedAt: new Date().toISOString() }
@@ -162,11 +164,13 @@ export const enhanceImage = async (req: AuthRequest, res: Response): Promise<any
           create: {
             userId,
             sessionId: finalSessionId,
+            campaignId: finalSessionId,
             mainImageUrl: imageUrl,
             scenes: [],
             metadata: { ...result, lastEnhancedAt: new Date().toISOString() }
           },
           update: {
+            campaignId: finalSessionId,
             mainImageUrl: imageUrl,
             metadata: { ...result, lastEnhancedAt: new Date().toISOString() }
           }
@@ -302,11 +306,13 @@ export const syncVault = async (req: AuthRequest, res: Response): Promise<any> =
                 create: {
                     userId,
                     sessionId: session_id,
+                    campaignId: session_id,
                     mainImageUrl,
                     scenes,
                     metadata: { ...vaultData, lastSyncedAt: new Date().toISOString() }
                 },
                 update: {
+                    campaignId: session_id,
                     mainImageUrl,
                     scenes,
                     metadata: { ...vaultData, lastSyncedAt: new Date().toISOString() }
