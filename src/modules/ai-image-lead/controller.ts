@@ -9,11 +9,9 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
   try {
     const { session_id, brief } = req.body;
     const userId = req.user?.id;
-    const businessName = brief?.business_name;
-
 
     if (session_id && userId) {
-      const session = await (prisma as any).aISession.findUnique({
+      const session = await (prisma as any).imageLeadResult.findUnique({
         where: { sessionId: session_id }
       });
       if (session && session.userId !== userId) {
@@ -24,13 +22,11 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
     const result = await imageLeadService.generateImages(req.body);
     console.log('[ImageLeadController] AI Response received:', JSON.stringify(result).substring(0, 500) + '...');
     
-    // Auto-save generated images to User's Asset library
-    // The AI backend returns result directly (sometimes with session_id/status: completed)
     if (userId && (result.session_id || result.status === 'completed' || result.success)) {
       const AI_BASE = process.env.AI_BACKEND_URL || 'https://apiplatform.raver.ai';
       const normalizeUrl = (url: string) => (url && url.startsWith('/') ? `${AI_BASE}${url}` : url);
 
-      const data = result.data || result; // Handle both result.data and flat result
+      const data = result.data || result;
       const scenes: any[] = [];
       if (Array.isArray(data.images)) {
           data.images.forEach((img: any) => {
@@ -51,64 +47,73 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
         });
       }
 
-      const finalSessionId = data.session_id || session_id || uuidv4();
+      const finalSessionId = data.session_id || session_id;
       const mainImageUrl = normalizeUrl(data.base_image_url || data.image_url || data.main_image_url || (scenes[0]?.url || null));
 
-      // Fallback: If scenes is empty but we have a main image, treat it as scene 1
       if (scenes.length === 0 && mainImageUrl) {
         scenes.push({ url: mainImageUrl, label: 'Scene 1' });
       }
 
-      // 1. Save results to the dedicated table (NEW)
-      try {
-        await (prisma as any).imageLeadResult.upsert({
-          where: { sessionId: finalSessionId },
-          create: {
-            userId,
-            sessionId: finalSessionId,
-            mainImageUrl: mainImageUrl,
-            scenes: scenes,
-          },
-          update: {
-            mainImageUrl: mainImageUrl,
-            scenes: scenes,
-          }
-        });
-        console.log(`[ImageLeadController] Saved generation results for session ${finalSessionId}`);
-
-        // 1.1 Sync to AISession metadata for quick access (NEW)
+      // Guard: Only save if we have a valid session ID and some content
+      if (userId && finalSessionId && (scenes.length > 0 || mainImageUrl)) {
+        // Sync to ImageLeadResult
         try {
-          await (prisma as any).aISession.upsert({
+          await (prisma as any).imageLeadResult.upsert({
             where: { sessionId: finalSessionId },
             create: {
               userId,
               sessionId: finalSessionId,
-              tag: businessName || null,
-              type: 'image-lead',
-              metadata: {
-                mainImageUrl: mainImageUrl,
-                scenes: scenes,
-                lastGeneratedAt: new Date().toISOString()
-              }
+              mainImageUrl: mainImageUrl,
+              scenes: scenes,
+              metadata: { ...result, lastGeneratedAt: new Date().toISOString() }
             },
             update: {
-              tag: businessName || undefined,
-              metadata: {
-                mainImageUrl: mainImageUrl,
-                scenes: scenes,
-                lastGeneratedAt: new Date().toISOString()
-              }
+              mainImageUrl: mainImageUrl,
+              scenes: scenes,
+              metadata: { ...result, lastGeneratedAt: new Date().toISOString() }
             }
           });
-        } catch (me) {
-          console.error('[ImageLeadController] Failed to sync metadata to AISession:', me);
+          console.log(`[ImageLeadController] Saved generation results for session ${finalSessionId}`);
+        } catch (e) {
+          console.error('[ImageLeadController] Failed to save imageLeadResult:', e);
         }
-      } catch (e) {
-        console.error('[ImageLeadController] Failed to save imageLeadResult:', e);
+
+        // Sync to high-level Campaign table for dashboard names
+        if (req.body.brief?.business_name) {
+          try {
+            await (prisma as any).campaign.upsert({
+              where: { id: finalSessionId }, // Using sessionId as campaignId if it follows the raver_campaign pattern
+              create: {
+                id: finalSessionId,
+                userId,
+                name: req.body.brief.business_name,
+                status: result.status || 'in_production',
+                audience: req.body.brief.target_audience,
+                format: req.body.brief.format,
+                platforms: req.body.brief.platform ? [req.body.brief.platform] : [],
+                tones: req.body.brief.brand_tone ? [req.body.brief.brand_tone] : [],
+                visualStyles: req.body.brief.mood ? [req.body.brief.mood] : [],
+                config: { brief: req.body.brief, session_id: finalSessionId }
+              },
+              update: {
+                name: req.body.brief.business_name,
+                status: result.status || 'in_production',
+                audience: req.body.brief.target_audience,
+                format: req.body.brief.format,
+                platforms: req.body.brief.platform ? [req.body.brief.platform] : [],
+                tones: req.body.brief.brand_tone ? [req.body.brief.brand_tone] : [],
+                visualStyles: req.body.brief.mood ? [req.body.brief.mood] : []
+              }
+            });
+            console.log(`[ImageLeadController] Synced campaign name "${req.body.brief.business_name}" for ${finalSessionId}`);
+          } catch (e) {
+            console.error('[ImageLeadController] Failed to sync high-level Campaign:', e);
+          }
+        }
+      } else {
+        console.warn(`[ImageLeadController] Skipping save for session ${finalSessionId || 'unknown'}: No content found.`);
       }
 
-      // 2. We can still save the main image to Assets for convenience, but maybe the user wants it ONLY in results now.
-      // Given "not in assets", I'll skip individual scene assets.
       if (data.image_url) {
         try {
           await assetService.createAsset({
@@ -135,7 +140,7 @@ export const enhanceImage = async (req: AuthRequest, res: Response): Promise<any
     const userId = req.user?.id;
 
     if (session_id && userId) {
-      const session = await (prisma as any).aISession.findUnique({
+      const session = await (prisma as any).imageLeadResult.findUnique({
         where: { sessionId: session_id }
       });
       if (session && session.userId !== userId) {
@@ -146,11 +151,10 @@ export const enhanceImage = async (req: AuthRequest, res: Response): Promise<any
     const result = await imageLeadService.enhanceImage(req.body);
     console.log('[ImageLeadController] Enhancement result received:', JSON.stringify(result).substring(0, 500) + '...');
 
-    const data = result.data || result; // Handle both result.data and flat result
+    const data = result.data || result;
     const finalSessionId = session_id || data.session_id;
     const imageUrl = data.image_url;
 
-    // 1. Auto-save enhanced image to ImageLeadResult (NEW Schema)
     if (userId && imageUrl && finalSessionId) {
       try {
         await (prisma as any).imageLeadResult.upsert({
@@ -159,44 +163,20 @@ export const enhanceImage = async (req: AuthRequest, res: Response): Promise<any
             userId,
             sessionId: finalSessionId,
             mainImageUrl: imageUrl,
-            scenes: []
+            scenes: [],
+            metadata: { ...result, lastEnhancedAt: new Date().toISOString() }
           },
           update: {
             mainImageUrl: imageUrl,
+            metadata: { ...result, lastEnhancedAt: new Date().toISOString() }
           }
         });
         console.log(`[ImageLeadController] Updated lead result with enhanced image for session ${finalSessionId}`);
-
-        // 1.1 Also sync to AISession metadata
-        try {
-          await (prisma as any).aISession.upsert({
-            where: { sessionId: finalSessionId },
-            create: {
-              userId,
-              sessionId: finalSessionId,
-              type: 'image-lead',
-              metadata: {
-                mainImageUrl: imageUrl,
-                lastEnhancedAt: new Date().toISOString()
-              }
-            },
-            update: {
-              metadata: {
-                mainImageUrl: imageUrl,
-                lastEnhancedAt: new Date().toISOString()
-              }
-            }
-          });
-        } catch (me) {
-          console.error('[ImageLeadController] Failed to sync enhancement meta:', me);
-        }
-
       } catch (e) {
         console.error('[ImageLeadController] Failed to update ImageLeadResult with enhanced image:', e);
       }
     }
 
-    // 2. Auto-save enhanced image to User's Asset library
     if (userId && imageUrl) {
       try {
         await (prisma as any).asset.create({
@@ -223,8 +203,7 @@ export const getVault = async (req: AuthRequest, res: Response): Promise<any> =>
         const { session_id } = req.params;
         const userId = req.user?.id;
 
-        // Verify session ownership
-        const session = await (prisma as any).aISession.findUnique({
+        const session = await (prisma as any).imageLeadResult.findUnique({
             where: { sessionId: session_id }
         });
 
@@ -246,13 +225,11 @@ export const createSession = async (req: AuthRequest, res: Response): Promise<an
     const { tag, metadata } = req.body;
 
     if (userId) {
-      await (prisma as any).aISession.create({
+      await (prisma as any).imageLeadResult.create({
         data: {
           userId,
           sessionId,
-          tag: tag || null,
-          type: 'image-lead',
-          metadata: metadata || {}
+          metadata: { ...(metadata || {}), tag: tag || null }
         }
       });
     }
@@ -271,11 +248,8 @@ export const listSessions = async (req: AuthRequest, res: Response): Promise<any
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const sessions = await (prisma as any).aISession.findMany({
-      where: {
-        userId,
-        type: 'image-lead'
-      },
+    const sessions = await (prisma as any).imageLeadResult.findMany({
+      where: { userId },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -295,10 +269,8 @@ export const syncVault = async (req: AuthRequest, res: Response): Promise<any> =
             return res.status(400).json({ success: false, message: 'Missing session_id or unauthorized' });
         }
 
-        // 1. Fetch from Vault
         const vaultData = await imageLeadService.getVault(session_id);
         
-        // 2. Map scenes
         const scenes: any[] = [];
         if (Array.isArray(vaultData.images)) {
           vaultData.images.forEach((img: any) => {
@@ -323,48 +295,28 @@ export const syncVault = async (req: AuthRequest, res: Response): Promise<any> =
                 : (vaultData.base_image_url || vaultData.main_image_url || vaultData.main_image) )
             : (scenes[0]?.url || null);
 
-        // 3. Upsert to Result Table
-        const result = await (prisma as any).imageLeadResult.upsert({
-            where: { sessionId: session_id },
-            create: {
-                userId,
-                sessionId: session_id,
-                mainImageUrl,
-                scenes
-            },
-            update: {
-                mainImageUrl,
-                scenes
-            }
-        });
-
-        // 4. Sync to AISession metadata (NEW)
-        try {
-            await (prisma as any).aISession.upsert({
+        // Guard: Only upsert if we actually found something in the vault
+        if (scenes.length > 0 || mainImageUrl) {
+            const result = await (prisma as any).imageLeadResult.upsert({
                 where: { sessionId: session_id },
                 create: {
                     userId,
                     sessionId: session_id,
-                    type: 'image-lead',
-                    metadata: {
-                        mainImageUrl,
-                        scenes,
-                        lastSyncedAt: new Date().toISOString()
-                    }
+                    mainImageUrl,
+                    scenes,
+                    metadata: { ...vaultData, lastSyncedAt: new Date().toISOString() }
                 },
                 update: {
-                    metadata: {
-                        mainImageUrl,
-                        scenes,
-                        lastSyncedAt: new Date().toISOString()
-                    }
+                    mainImageUrl,
+                    scenes,
+                    metadata: { ...vaultData, lastSyncedAt: new Date().toISOString() }
                 }
             });
-        } catch (me) {
-            console.error('[ImageLeadController] Sync metadata error:', me);
+            return res.json({ success: true, data: result });
+        } else {
+            console.warn(`[ImageLeadController] Sync skipped for ${session_id}: Vault is empty.`);
+            return res.json({ success: true, message: 'Vault is empty, nothing to sync.', data: [] });
         }
-
-        return res.json({ success: true, data: result });
     } catch (error: any) {
         console.error('[ImageLeadController] Sync Error:', error.message);
         return res.status(500).json({ success: false, message: error.message });

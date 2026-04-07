@@ -9,17 +9,22 @@ export const renderCampaign = async (req: AuthRequest, res: Response): Promise<a
     const userId = req.user?.id;
     const result = await editorService.renderCampaign(req.body);
 
-    // If session_id is returned or provided, persist tag
     const sessionId = body.session_id || result.session_id;
-    if (userId && sessionId) {
-      await (prisma as any).aISession.upsert({
+    const hasContent = result.video_url || result.url || (result.metadata && Object.keys(result.metadata).length > 0);
+
+    if (userId && sessionId && hasContent) {
+      const metadata = {
+        ...(result.metadata || (typeof result === 'object' ? result : {})),
+        tag: tag || undefined,
+        lastUpdatedAt: new Date().toISOString()
+      };
+      await (prisma as any).editorResult.upsert({
         where: { sessionId },
-        update: { tag: tag || undefined },
+        update: { metadata },
         create: {
           userId,
           sessionId,
-          tag: tag || null,
-          type: 'editor'
+          metadata
         }
       });
     }
@@ -32,20 +37,32 @@ export const renderCampaign = async (req: AuthRequest, res: Response): Promise<a
 
 export const exportFormats = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const { tag, ...body } = req.body;
+    const { tag, format, ...body } = req.body;
     const userId = req.user?.id;
     const result = await editorService.exportFormats(req.body);
 
     const sessionId = body.session_id || result.session_id;
-    if (userId && sessionId) {
-      await (prisma as any).aISession.upsert({
+    const exportUrl = result.video_url || result.url;
+
+    if (userId && sessionId && exportUrl) {
+      const metadata = {
+        ...(result.metadata || (typeof result === 'object' ? result : {})),
+        tag: tag || undefined,
+        lastUpdatedAt: new Date().toISOString()
+      };
+      await (prisma as any).editorResult.upsert({
         where: { sessionId },
-        update: { tag: tag || undefined },
+        update: { 
+          videoUrl: exportUrl,
+          format: format || result.format,
+          metadata
+        },
         create: {
           userId,
           sessionId,
-          tag: tag || null,
-          type: 'editor'
+          videoUrl: exportUrl,
+          format: format || result.format,
+          metadata
         }
       });
     }
@@ -59,6 +76,15 @@ export const exportFormats = async (req: AuthRequest, res: Response): Promise<an
 export const getRenders = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { session_id } = req.params;
+    const userId = req.user?.id;
+
+    if (userId && session_id) {
+        const local = await (prisma as any).editorResult.findUnique({ where: { sessionId: session_id } });
+        if (local && local.userId !== userId) {
+            return res.status(403).json({ success: false, message: 'Unauthorized' });
+        }
+    }
+
     const result = await editorService.getRenders(session_id as string);
     return res.json({ success: true, data: result });
   } catch (error: any) {

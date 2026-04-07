@@ -84,6 +84,7 @@ model ImageLeadResult {
   campaignId   String?   @db.Uuid
   mainImageUrl String?
   scenes       Json?
+  metadata     Json?
   createdAt    DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
   Campaign     Campaign? @relation(fields: [campaignId], references: [id])
@@ -133,30 +134,87 @@ model Template {
 }
 
 model User {
-  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email            String            @unique
-  fullName         String?
-  avatarUrl        String?
-  createdAt        DateTime          @default(now()) @db.Timestamptz(6)
-  updatedAt        DateTime          @default(now()) @db.Timestamptz(6)
-  password         String?
-  bio              String?
-  facebook         String?
-  instagram        String?
-  linkedin         String?
-  professionalRole String?
-  twitter          String?
-  website          String?
-  aiInsights       Boolean           @default(true)
-  campaignUpdates  Boolean           @default(true)
-  teamActivity     Boolean           @default(true)
-  weeklySummary    Boolean           @default(true)
-  aiSessions       AISession[]
-  agents           Agent[]
-  assets           Asset[]
-  Billing          Billing?
-  campaigns        Campaign[]
-  imageLeadResults ImageLeadResult[]
-  paymentMethods   PaymentMethod[]
-  projects         Project[]
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email             String            @unique
+  fullName          String?
+  avatarUrl         String?
+  createdAt         DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime          @default(now()) @db.Timestamptz(6)
+  password          String?
+  bio               String?
+  facebook          String?
+  instagram         String?
+  linkedin          String?
+  professionalRole  String?
+  twitter           String?
+  website           String?
+  aiInsights        Boolean           @default(true)
+  campaignUpdates   Boolean           @default(true)
+  teamActivity      Boolean           @default(true)
+  weeklySummary     Boolean           @default(true)
+  aiSessions        AISession[]
+  agents            Agent[]
+  assets            Asset[]
+  Billing           Billing?
+  campaigns         Campaign[]
+  imageLeadResults  ImageLeadResult[]
+  producerResults   ProducerResult[]
+  audioLeadResults  AudioLeadResult[]
+  copyLeadResults   CopyLeadResult[]
+  editorResults     EditorResult[]
+  paymentMethods    PaymentMethod[]
+  projects          Project[]
+}
+
+model ProducerResult {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @db.Uuid
+  sessionId    String?
+  campaignId   String   @unique
+  brief        Json?
+  status       String?
+  result       Json?
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @db.Timestamptz(6)
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AudioLeadResult {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @db.Uuid
+  sessionId    String?
+  musicUrl     String?
+  voiceoverUrl String?
+  mixUrl       String?
+  metadata     Json?
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @db.Timestamptz(6)
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CopyLeadResult {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @db.Uuid
+  sessionId    String?
+  script       Json?
+  captions     Json?
+  overlays     Json?
+  cta          Json?
+  hashtags     Json?
+  metadata     Json?
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @db.Timestamptz(6)
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EditorResult {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @db.Uuid
+  sessionId    String?
+  videoUrl     String?
+  format       String?
+  metadata     Json?
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @db.Timestamptz(6)
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

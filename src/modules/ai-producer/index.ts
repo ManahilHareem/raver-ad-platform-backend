@@ -103,4 +103,24 @@ router.get('/campaign/:campaign_id', controller.getCampaign);
  */
 router.post('/campaign/:campaign_id/approve', controller.approveCampaign);
 
+/**
+ * @swagger
+ * /api/ai/producer/campaign/{campaign_id}:
+ *   delete:
+ *     summary: Delete a campaign from the database
+ *     tags: [AI Producer]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: campaign_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Campaign deleted
+ */
+router.delete('/campaign/:campaign_id', controller.deleteCampaign);
+
 export default router;
