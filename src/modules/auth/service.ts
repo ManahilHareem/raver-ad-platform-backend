@@ -20,7 +20,7 @@ export const signup = async (email: string, password: string, fullName?: string)
     }
   });
 
-  const token = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
+  const token = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '1d' });
   return { user: { id: newUser.id, email: newUser.email, fullName: newUser.fullName }, token };
 };
 
@@ -35,6 +35,6 @@ export const login = async (email: string, password: string) => {
     throw new Error('Invalid email or password');
   }
 
-  const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+  const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '1d' });
   return { user: { id: user.id, email: user.email, fullName: user.fullName }, token };
 };
