@@ -13,6 +13,29 @@ export const renderCampaign = async (req: AuthRequest, res: Response): Promise<a
     const hasContent = result.video_url || result.url || (result.metadata && Object.keys(result.metadata).length > 0);
 
     if (userId && sessionId && hasContent) {
+      // 1. Sync to high-level Campaign table first (Parent)
+      try {
+        await (prisma as any).campaign.upsert({
+          where: { id: sessionId },
+          create: {
+            id: sessionId,
+            userId,
+            name: req.body.brief?.business_name || 'AI Video Campaign',
+            status: 'ready_for_review',
+            audience: req.body.brief?.target_audience,
+            format: req.body.brief?.format,
+            config: { brief: req.body.brief, session_id: sessionId }
+          },
+          update: {
+            status: 'ready_for_review',
+            name: req.body.brief?.business_name || undefined,
+          }
+        });
+      } catch (e) {
+        console.error('[EditorController] Campaign sync error:', e);
+      }
+
+      // 2. Sync to EditorResult (Child)
       const metadata = {
         ...(result.metadata || (typeof result === 'object' ? result : {})),
         tag: tag || undefined,
@@ -49,6 +72,26 @@ export const exportFormats = async (req: AuthRequest, res: Response): Promise<an
     const exportUrl = result.video_url || result.url;
 
     if (userId && sessionId && exportUrl) {
+      // 1. Sync to high-level Campaign table first (Parent)
+      try {
+        await (prisma as any).campaign.upsert({
+          where: { id: sessionId },
+          create: {
+            id: sessionId,
+            userId,
+            name: req.body.brief?.business_name || 'AI Export Campaign',
+            status: 'completed',
+            config: { brief: req.body.brief, session_id: sessionId }
+          },
+          update: {
+            status: 'completed'
+          }
+        });
+      } catch (e) {
+        console.error('[EditorController] Campaign sync error:', e);
+      }
+
+      // 2. Sync to EditorResult (Child)
       const metadata = {
         ...(result.metadata || (typeof result === 'object' ? result : {})),
         tag: tag || undefined,

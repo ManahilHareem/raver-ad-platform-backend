@@ -10,6 +10,34 @@ export const generateScript = async (req: AuthRequest, res: Response): Promise<a
     const result = await copyService.generateScript(req.body);
 
     if (userId && session_id && result && (typeof result === 'string' ? result.length > 0 : Object.keys(result).length > 0)) {
+      // 1. Sync to high-level Campaign table first (Parent)
+      try {
+        await (prisma as any).campaign.upsert({
+          where: { id: session_id },
+          create: {
+            id: session_id,
+            userId,
+            name: req.body.brief?.business_name || 'AI Copy Campaign',
+            status: 'in_production',
+            audience: req.body.brief?.target_audience,
+            format: req.body.brief?.format,
+            platforms: req.body.brief?.platform ? [req.body.brief.platform] : [],
+            tones: req.body.brief?.tone ? [req.body.brief.tone] : [],
+            visualStyles: req.body.brief?.mood ? [req.body.brief.mood] : [],
+            config: { brief: req.body.brief, session_id: session_id }
+          },
+          update: {
+            name: req.body.brief?.business_name || undefined,
+            status: 'in_production',
+            audience: req.body.brief?.target_audience,
+            format: req.body.brief?.format,
+          }
+        });
+      } catch (e) {
+        console.error('[CopyLeadController] Campaign sync error:', e);
+      }
+
+      // 2. Sync to CopyLeadResult (Child)
       await (prisma as any).copyLeadResult.upsert({
         where: { sessionId: session_id },
         update: { 
@@ -25,27 +53,6 @@ export const generateScript = async (req: AuthRequest, res: Response): Promise<a
           metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
         }
       });
-
-      // Sync to high-level Campaign table
-      if (req.body.brief?.business_name) {
-        try {
-          await (prisma as any).campaign.upsert({
-            where: { id: session_id },
-            update: { name: req.body.brief.business_name },
-            create: {
-              id: session_id,
-              userId,
-              name: req.body.brief.business_name,
-              status: 'in_production',
-              audience: req.body.brief.target_audience,
-              format: req.body.brief.format,
-              config: { brief: req.body.brief, session_id: session_id }
-            }
-          });
-        } catch (e) {
-            console.error('[CopyLeadController] Campaign sync error:', e);
-        }
-      }
     }
 
     return res.json({ success: true, data: result });

@@ -56,14 +56,45 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
 
       // Guard: Only save if we have a valid session ID and some content
       if (userId && finalSessionId && (scenes.length > 0 || mainImageUrl)) {
-        // Sync to ImageLeadResult
+        // 1. Sync to high-level Campaign table first (Parent)
+        try {
+          await (prisma as any).campaign.upsert({
+            where: { id: finalSessionId },
+            create: {
+              id: finalSessionId,
+              userId,
+              name: req.body.brief?.business_name || 'AI Image Campaign',
+              status: result.status || 'in_production',
+              audience: req.body.brief?.target_audience,
+              format: req.body.brief?.format,
+              platforms: req.body.brief?.platform ? [req.body.brief.platform] : [],
+              tones: req.body.brief?.brand_tone ? [req.body.brief.brand_tone] : [],
+              visualStyles: req.body.brief?.mood ? [req.body.brief.mood] : [],
+              config: { brief: req.body.brief, session_id: finalSessionId }
+            },
+            update: {
+              name: req.body.brief?.business_name || undefined,
+              status: result.status || 'in_production',
+              audience: req.body.brief?.target_audience,
+              format: req.body.brief?.format,
+              platforms: req.body.brief?.platform ? [req.body.brief.platform] : [],
+              tones: req.body.brief?.brand_tone ? [req.body.brief.brand_tone] : [],
+              visualStyles: req.body.brief?.mood ? [req.body.brief.mood] : []
+            }
+          });
+          console.log(`[ImageLeadController] Synced campaign "${req.body.brief?.business_name || finalSessionId}"`);
+        } catch (e) {
+          console.error('[ImageLeadController] Failed to sync high-level Campaign:', e);
+        }
+
+        // 2. Sync to ImageLeadResult (Child)
         try {
           await (prisma as any).imageLeadResult.upsert({
             where: { sessionId: finalSessionId },
             create: {
               userId,
               sessionId: finalSessionId,
-              campaignId: finalSessionId, // Linking to Campaign UUID/String
+              campaignId: finalSessionId,
               mainImageUrl: mainImageUrl,
               scenes: scenes,
               metadata: { ...result, lastGeneratedAt: new Date().toISOString() }
@@ -78,39 +109,6 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
           console.log(`[ImageLeadController] Saved generation results for session ${finalSessionId}`);
         } catch (e) {
           console.error('[ImageLeadController] Failed to save imageLeadResult:', e);
-        }
-
-        // Sync to high-level Campaign table for dashboard names
-        if (req.body.brief?.business_name) {
-          try {
-            await (prisma as any).campaign.upsert({
-              where: { id: finalSessionId }, // Using sessionId as campaignId if it follows the raver_campaign pattern
-              create: {
-                id: finalSessionId,
-                userId,
-                name: req.body.brief.business_name,
-                status: result.status || 'in_production',
-                audience: req.body.brief.target_audience,
-                format: req.body.brief.format,
-                platforms: req.body.brief.platform ? [req.body.brief.platform] : [],
-                tones: req.body.brief.brand_tone ? [req.body.brief.brand_tone] : [],
-                visualStyles: req.body.brief.mood ? [req.body.brief.mood] : [],
-                config: { brief: req.body.brief, session_id: finalSessionId }
-              },
-              update: {
-                name: req.body.brief.business_name,
-                status: result.status || 'in_production',
-                audience: req.body.brief.target_audience,
-                format: req.body.brief.format,
-                platforms: req.body.brief.platform ? [req.body.brief.platform] : [],
-                tones: req.body.brief.brand_tone ? [req.body.brief.brand_tone] : [],
-                visualStyles: req.body.brief.mood ? [req.body.brief.mood] : []
-              }
-            });
-            console.log(`[ImageLeadController] Synced campaign name "${req.body.brief.business_name}" for ${finalSessionId}`);
-          } catch (e) {
-            console.error('[ImageLeadController] Failed to sync high-level Campaign:', e);
-          }
         }
       } else {
         console.warn(`[ImageLeadController] Skipping save for session ${finalSessionId || 'unknown'}: No content found.`);

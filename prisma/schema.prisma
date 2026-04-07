@@ -31,7 +31,7 @@ model Agent {
 model Asset {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId     String    @db.Uuid
-  campaignId String?   @db.Uuid
+  campaignId String?
   type       String
   url        String
   fileSize   Int?
@@ -52,7 +52,7 @@ model Billing {
 }
 
 model Campaign {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id              String            @id @default(uuid())
   userId          String            @db.Uuid
   name            String
   status          String            @default("draft")
@@ -85,7 +85,7 @@ model ImageLeadResult {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId       String    @db.Uuid
   sessionId    String    @unique
-  campaignId   String?   @db.Uuid
+  campaignId   String?
   mainImageUrl String?
   scenes       Json?
   metadata     Json?
@@ -97,7 +97,7 @@ model ImageLeadResult {
 
 model Metric {
   id          BigInt   @id @default(autoincrement())
-  campaignId  String   @db.Uuid
+  campaignId  String
   impressions Int      @default(0)
   clicks      Int      @default(0)
   spend       Decimal  @default(0.00) @db.Decimal(12, 2)
@@ -174,7 +174,7 @@ model ProducerResult {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId       String   @db.Uuid
   sessionId    String?
-  campaignId   String?   @unique @db.Uuid
+  campaignId   String?   @unique
   brief        Json?
   status       String?
   result       Json?
@@ -188,7 +188,7 @@ model AudioLeadResult {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId       String    @db.Uuid
   sessionId    String?
-  campaignId   String?   @db.Uuid
+  campaignId   String?
   musicUrl     String?
   voiceoverUrl String?
   mixUrl       String?
@@ -203,7 +203,7 @@ model CopyLeadResult {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId       String    @db.Uuid
   sessionId    String?
-  campaignId   String?   @db.Uuid
+  campaignId   String?
   script       Json?
   captions     Json?
   overlays     Json?
@@ -220,7 +220,7 @@ model EditorResult {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId       String    @db.Uuid
   sessionId    String?
-  campaignId   String?   @db.Uuid
+  campaignId   String?
   videoUrl     String?
   format       String?
   metadata     Json?

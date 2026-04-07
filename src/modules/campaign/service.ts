@@ -1,7 +1,7 @@
 import prisma from '../../db/prisma';
 
-const isValidUuid = (uuid: string) => {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid);
+const isValidCampaignId = (id: string) => {
+  return typeof id === 'string' && id.length > 0;
 };
 
 export const getAllCampaigns = async () => {
@@ -16,7 +16,7 @@ export const getAllCampaigns = async () => {
 };
 
 export const getCampaignById = async (id: string) => {
-  if (!isValidUuid(id)) return null;
+  if (!isValidCampaignId(id)) return null;
   try {
     return await prisma.campaign.findUnique({
       where: { id },
@@ -60,7 +60,7 @@ export const createCampaign = async (data: any) => {
 };
 
 export const updateCampaign = async (id: string, data: any) => {
-  if (!isValidUuid(id)) throw new Error('Invalid Campaign ID format');
+  if (!isValidCampaignId(id)) throw new Error('Invalid Campaign ID format');
   try {
     return await prisma.campaign.update({
       where: { id },
@@ -73,7 +73,7 @@ export const updateCampaign = async (id: string, data: any) => {
 };
 
 export const deleteCampaign = async (id: string) => {
-  if (!isValidUuid(id)) throw new Error('Invalid Campaign ID format');
+  if (!isValidCampaignId(id)) throw new Error('Invalid Campaign ID format');
   try {
     // 1. Manually clean up associated records that don't have automatic Cascade Delete
     
