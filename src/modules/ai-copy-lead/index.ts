@@ -203,4 +203,38 @@ router.post('/hashtags', controller.generateHashtags);
  */
 router.post('/produce', controller.produceCopy);
 
+/**
+ * @swagger
+ * /api/ai/copy-lead/results:
+ *   get:
+ *     summary: Get all copy lead results for the authenticated user
+ *     tags: [AI Copy Lead]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of copy lead results
+ */
+router.get('/results', controller.getResults);
+
+/**
+ * @swagger
+ * /api/ai/copy-lead/vault/{session_id}:
+ *   get:
+ *     summary: Get specific session vault from proxy
+ *     tags: [AI Copy Lead]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: session_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Vault contents
+ */
+router.get('/vault/:session_id', controller.getVault);
+
 export default router;

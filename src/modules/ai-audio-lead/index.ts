@@ -157,6 +157,20 @@ router.post('/mix', controller.mixAudio);
 
 /**
  * @swagger
+ * /api/ai/audio-lead/results:
+ *   get:
+ *     summary: Get all audio lead results for the authenticated user
+ *     tags: [AI Audio Lead]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all audio results
+ */
+router.get('/results', controller.getResults);
+
+/**
+ * @swagger
  * /api/ai/audio-lead/vault/{session_id}:
  *   get:
  *     summary: List all audio files stored for a session

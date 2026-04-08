@@ -180,8 +180,9 @@ model ProducerResult {
 model AudioLeadResult {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId       String    @db.Uuid
-  sessionId    String?
+  sessionId    String?   @unique
   campaignId   String?
+  businessName String?
   musicUrl     String?
   voiceoverUrl String?
   mixUrl       String?
@@ -194,8 +195,9 @@ model AudioLeadResult {
 model CopyLeadResult {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId       String    @db.Uuid
-  sessionId    String?
+  sessionId    String?   @unique
   campaignId   String?
+  businessName String?
   script       Json?
   captions     Json?
   overlays     Json?
@@ -210,7 +212,7 @@ model CopyLeadResult {
 model EditorResult {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId       String    @db.Uuid
-  sessionId    String?
+  sessionId    String?   @unique
   campaignId   String?
   videoUrl     String?
   format       String?

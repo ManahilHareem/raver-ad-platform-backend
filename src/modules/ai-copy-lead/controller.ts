@@ -14,15 +14,17 @@ export const generateScript = async (req: AuthRequest, res: Response): Promise<a
         where: { sessionId: session_id },
         update: { 
           campaignId: session_id,
+          businessName: req.body.brief?.business_name,
           script: result,
-          metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
+          metadata: { ...result, brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
+          businessName: req.body.brief?.business_name,
           script: result,
-          metadata: { ...result, lastUpdatedAt: new Date().toISOString() }
+          metadata: { ...result, brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
       });
     }
@@ -44,15 +46,17 @@ export const generateCaptions = async (req: AuthRequest, res: Response): Promise
         where: { sessionId: session_id },
         update: { 
           campaignId: session_id,
+          businessName: req.body.brief?.business_name,
           captions: result,
-          metadata: { ...(Array.isArray(result) ? { captions_list: result } : result), lastUpdatedAt: new Date().toISOString() }
+          metadata: { ...(Array.isArray(result) ? { captions_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
+          businessName: req.body.brief?.business_name,
           captions: result,
-          metadata: { ...(Array.isArray(result) ? { captions_list: result } : result), lastUpdatedAt: new Date().toISOString() }
+          metadata: { ...(Array.isArray(result) ? { captions_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
       });
     }
@@ -74,15 +78,17 @@ export const generateOverlays = async (req: AuthRequest, res: Response): Promise
         where: { sessionId: session_id },
         update: { 
           campaignId: session_id,
+          businessName: req.body.brief?.business_name,
           overlays: result,
-          metadata: { ...(Array.isArray(result) ? { overlays_list: result } : result), lastUpdatedAt: new Date().toISOString() }
+          metadata: { ...(Array.isArray(result) ? { overlays_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
+          businessName: req.body.brief?.business_name,
           overlays: result,
-          metadata: { ...(Array.isArray(result) ? { overlays_list: result } : result), lastUpdatedAt: new Date().toISOString() }
+          metadata: { ...(Array.isArray(result) ? { overlays_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
       });
     }
@@ -104,15 +110,17 @@ export const generateCta = async (req: AuthRequest, res: Response): Promise<any>
         where: { sessionId: session_id },
         update: { 
           campaignId: session_id,
+          businessName: req.body.brief?.business_name,
           cta: result,
-          metadata: { ...(typeof result === 'object' ? result : { cta_text: result }), lastUpdatedAt: new Date().toISOString() }
+          metadata: { ...(typeof result === 'object' ? result : { cta_text: result }), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
+          businessName: req.body.brief?.business_name,
           cta: result,
-          metadata: { ...(typeof result === 'object' ? result : { cta_text: result }), lastUpdatedAt: new Date().toISOString() }
+          metadata: { ...(typeof result === 'object' ? result : { cta_text: result }), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
       });
     }
@@ -134,15 +142,17 @@ export const generateHashtags = async (req: AuthRequest, res: Response): Promise
         where: { sessionId: session_id },
         update: { 
           campaignId: session_id,
+          businessName: req.body.brief?.business_name,
           hashtags: result,
-          metadata: { ...(Array.isArray(result) ? { hashtags_list: result } : result), lastUpdatedAt: new Date().toISOString() }
+          metadata: { ...(Array.isArray(result) ? { hashtags_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
+          businessName: req.body.brief?.business_name,
           hashtags: result,
-          metadata: { ...(Array.isArray(result) ? { hashtags_list: result } : result), lastUpdatedAt: new Date().toISOString() }
+          metadata: { ...(Array.isArray(result) ? { hashtags_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
       });
     }
@@ -164,13 +174,21 @@ export const produceCopy = async (req: AuthRequest, res: Response): Promise<any>
         where: { sessionId: session_id },
         update: { 
           campaignId: session_id,
-          metadata: result 
+          businessName: req.body.brief?.business_name,
+          script: result.script || undefined,
+          overlays: result.overlays || undefined,
+          captions: result.platform_copy || undefined, // Often contains captions
+          metadata: { ...result, brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
-          metadata: result
+          businessName: req.body.brief?.business_name,
+          script: result.script || {},
+          overlays: result.overlays || [],
+          captions: result.platform_copy || {},
+          metadata: { ...result, brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
       });
 
@@ -193,6 +211,43 @@ export const produceCopy = async (req: AuthRequest, res: Response): Promise<any>
     }
 
     return res.json({ success: true, data: result });
+  } catch (error: any) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+export const getVault = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { session_id } = req.params;
+    const userId = req.user?.id;
+
+    if (userId && session_id) {
+        const local = await (prisma as any).copyLeadResult.findUnique({ where: { sessionId: session_id } });
+        if (local && local.userId !== userId) {
+            return res.status(403).json({ success: false, message: 'Unauthorized' });
+        }
+    }
+
+    const result = await copyService.getVault(session_id as string);
+    return res.json({ success: true, data: result });
+  } catch (error: any) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+export const getResults = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const results = await (prisma as any).copyLeadResult.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return res.json({ success: true, data: results });
   } catch (error: any) {
     return res.status(error.status || 500).json({ success: false, message: error.message });
   }
