@@ -28,31 +28,6 @@ export const generateMusic = async (req: AuthRequest, res: Response): Promise<an
         }
       });
 
-      // Sync to high-level Campaign table
-      if (req.body.brief?.business_name) {
-        try {
-          await (prisma as any).campaign.upsert({
-            where: { id: session_id },
-            create: {
-              id: session_id,
-              userId,
-              name: req.body.brief.business_name,
-              status: 'in_production',
-              audience: req.body.brief.target_audience,
-              format: req.body.brief.format,
-              platforms: req.body.brief.platform ? [req.body.brief.platform] : [],
-              config: { brief: req.body.brief, session_id: session_id }
-            },
-            update: {
-              name: req.body.brief.business_name,
-              audience: req.body.brief.target_audience,
-              format: req.body.brief.format
-            }
-          });
-        } catch (e) {
-          console.error('[AudioLeadController] Campaign sync error:', e);
-        }
-      }
     }
 
     return res.json({ success: true, data: result });
@@ -86,22 +61,6 @@ export const generateVoiceover = async (req: AuthRequest, res: Response): Promis
         }
       });
 
-      // Sync to high-level Campaign table
-      if (req.body.brief?.business_name) {
-        try {
-          await (prisma as any).campaign.upsert({
-            where: { id: session_id },
-            update: { name: req.body.brief.business_name },
-            create: {
-              id: session_id,
-              userId,
-              name: req.body.brief.business_name,
-              status: 'in_production',
-              config: { brief: req.body.brief, session_id: session_id }
-            }
-          });
-        } catch (e) {}
-      }
     }
 
     return res.json({ success: true, data: result });
@@ -139,22 +98,7 @@ export const produceAudio = async (req: AuthRequest, res: Response): Promise<any
         }
       });
 
-      // Sync to high-level Campaign table
-      if (req.body.brief?.business_name) {
-        try {
-          await (prisma as any).campaign.upsert({
-            where: { id: session_id },
-            update: { name: req.body.brief.business_name },
-            create: {
-              id: session_id,
-              userId,
-              name: req.body.brief.business_name,
-              status: 'in_production',
-              config: { brief: req.body.brief, session_id: session_id }
-            }
-          });
-        } catch (e) {}
-      }
+
     }
 
     return res.json({ success: true, data: result });

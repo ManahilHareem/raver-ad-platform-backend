@@ -154,22 +154,6 @@ export const produceCopy = async (req: AuthRequest, res: Response): Promise<any>
         }
       });
 
-      // Sync to high-level Campaign table
-      if (req.body.brief?.business_name) {
-        try {
-          await (prisma as any).campaign.upsert({
-            where: { id: session_id },
-            update: { name: req.body.brief.business_name },
-            create: {
-              id: session_id,
-              userId,
-              name: req.body.brief.business_name,
-              status: 'in_production',
-              config: { brief: req.body.brief, session_id: session_id }
-            }
-          });
-        } catch (e) {}
-      }
     }
 
     return res.json({ success: true, data: result });
