@@ -195,9 +195,10 @@ model AudioLeadResult {
 model CopyLeadResult {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId       String    @db.Uuid
-  sessionId    String?   @unique
+  sessionId    String?
   campaignId   String?
   businessName String?
+  type         String?
   script       Json?
   captions     Json?
   overlays     Json?

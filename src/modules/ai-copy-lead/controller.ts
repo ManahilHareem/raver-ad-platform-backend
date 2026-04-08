@@ -10,19 +10,13 @@ export const generateScript = async (req: AuthRequest, res: Response): Promise<a
     const result = await copyService.generateScript(req.body);
 
     if (userId && session_id && result && (typeof result === 'string' ? result.length > 0 : Object.keys(result).length > 0)) {
-      await (prisma as any).copyLeadResult.upsert({
-        where: { sessionId: session_id },
-        update: { 
-          campaignId: session_id,
-          businessName: req.body.brief?.business_name,
-          script: result,
-          metadata: { ...result, brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
-        },
-        create: {
+      await (prisma as any).copyLeadResult.create({
+        data: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
           businessName: req.body.brief?.business_name,
+          type: 'script',
           script: result,
           metadata: { ...result, brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
@@ -42,19 +36,13 @@ export const generateCaptions = async (req: AuthRequest, res: Response): Promise
     const result = await copyService.generateCaptions(req.body);
 
     if (userId && session_id && result && (Array.isArray(result) ? result.length > 0 : true)) {
-      await (prisma as any).copyLeadResult.upsert({
-        where: { sessionId: session_id },
-        update: { 
-          campaignId: session_id,
-          businessName: req.body.brief?.business_name,
-          captions: result,
-          metadata: { ...(Array.isArray(result) ? { captions_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
-        },
-        create: {
+      await (prisma as any).copyLeadResult.create({
+        data: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
           businessName: req.body.brief?.business_name,
+          type: 'captions',
           captions: result,
           metadata: { ...(Array.isArray(result) ? { captions_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
@@ -74,19 +62,13 @@ export const generateOverlays = async (req: AuthRequest, res: Response): Promise
     const result = await copyService.generateOverlays(req.body);
 
     if (userId && session_id && result && (Array.isArray(result) ? result.length > 0 : true)) {
-      await (prisma as any).copyLeadResult.upsert({
-        where: { sessionId: session_id },
-        update: { 
-          campaignId: session_id,
-          businessName: req.body.brief?.business_name,
-          overlays: result,
-          metadata: { ...(Array.isArray(result) ? { overlays_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
-        },
-        create: {
+      await (prisma as any).copyLeadResult.create({
+        data: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
           businessName: req.body.brief?.business_name,
+          type: 'overlays',
           overlays: result,
           metadata: { ...(Array.isArray(result) ? { overlays_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
@@ -106,19 +88,13 @@ export const generateCta = async (req: AuthRequest, res: Response): Promise<any>
     const result = await copyService.generateCta(req.body);
 
     if (userId && session_id && result) {
-      await (prisma as any).copyLeadResult.upsert({
-        where: { sessionId: session_id },
-        update: { 
-          campaignId: session_id,
-          businessName: req.body.brief?.business_name,
-          cta: result,
-          metadata: { ...(typeof result === 'object' ? result : { cta_text: result }), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
-        },
-        create: {
+      await (prisma as any).copyLeadResult.create({
+        data: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
           businessName: req.body.brief?.business_name,
+          type: 'cta',
           cta: result,
           metadata: { ...(typeof result === 'object' ? result : { cta_text: result }), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
@@ -138,19 +114,13 @@ export const generateHashtags = async (req: AuthRequest, res: Response): Promise
     const result = await copyService.generateHashtags(req.body);
 
     if (userId && session_id && result && (Array.isArray(result) ? result.length > 0 : true)) {
-      await (prisma as any).copyLeadResult.upsert({
-        where: { sessionId: session_id },
-        update: { 
-          campaignId: session_id,
-          businessName: req.body.brief?.business_name,
-          hashtags: result,
-          metadata: { ...(Array.isArray(result) ? { hashtags_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
-        },
-        create: {
+      await (prisma as any).copyLeadResult.create({
+        data: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
           businessName: req.body.brief?.business_name,
+          type: 'hashtags',
           hashtags: result,
           metadata: { ...(Array.isArray(result) ? { hashtags_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
@@ -170,21 +140,13 @@ export const produceCopy = async (req: AuthRequest, res: Response): Promise<any>
     const result = await copyService.produceCopy(req.body);
 
     if (userId && session_id && result && Object.keys(result).length > 0) {
-      await (prisma as any).copyLeadResult.upsert({
-        where: { sessionId: session_id },
-        update: { 
-          campaignId: session_id,
-          businessName: req.body.brief?.business_name,
-          script: result.script || undefined,
-          overlays: result.overlays || undefined,
-          captions: result.platform_copy || undefined, // Often contains captions
-          metadata: { ...result, brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
-        },
-        create: {
+      await (prisma as any).copyLeadResult.create({
+        data: {
           userId,
           sessionId: session_id,
           campaignId: session_id,
           businessName: req.body.brief?.business_name,
+          type: 'package',
           script: result.script || {},
           overlays: result.overlays || [],
           captions: result.platform_copy || {},
@@ -222,7 +184,7 @@ export const getVault = async (req: AuthRequest, res: Response): Promise<any> =>
     const userId = req.user?.id;
 
     if (userId && session_id) {
-        const local = await (prisma as any).copyLeadResult.findUnique({ where: { sessionId: session_id } });
+        const local = await (prisma as any).copyLeadResult.findFirst({ where: { sessionId: session_id, userId } });
         if (local && local.userId !== userId) {
             return res.status(403).json({ success: false, message: 'Unauthorized' });
         }
