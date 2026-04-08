@@ -262,3 +262,35 @@ export const getResults = async (req: AuthRequest, res: Response): Promise<any> 
     return res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
+
+export const deleteResult = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { session_id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const record = await (prisma as any).audioLeadResult.findUnique({
+      where: { sessionId: session_id }
+    });
+
+    if (!record) {
+      return res.status(404).json({ success: false, message: 'Result not found' });
+    }
+
+    if (record.userId !== userId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized access to research archives' });
+    }
+
+    await (prisma as any).audioLeadResult.delete({
+      where: { sessionId: session_id }
+    });
+
+    return res.json({ success: true, message: 'Synthesis archived successfully' });
+  } catch (error: any) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+

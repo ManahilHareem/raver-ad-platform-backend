@@ -214,3 +214,32 @@ export const getResults = async (req: AuthRequest, res: Response): Promise<any> 
     return res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
+
+export const deleteResult = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { session_id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    // Check if any results exist for this session and belong to the user
+    const results = await (prisma as any).copyLeadResult.findMany({
+      where: { sessionId: session_id, userId }
+    });
+
+    if (results.length === 0) {
+      return res.status(404).json({ success: false, message: 'Synthesis records not found in archives' });
+    }
+
+    await (prisma as any).copyLeadResult.deleteMany({
+      where: { sessionId: session_id, userId }
+    });
+
+    return res.json({ success: true, message: 'Linguistic synthesis archived successfully' });
+  } catch (error: any) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+

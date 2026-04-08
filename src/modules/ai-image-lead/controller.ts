@@ -300,3 +300,35 @@ export const syncVault = async (req: AuthRequest, res: Response): Promise<any> =
         return res.status(500).json({ success: false, message: error.message });
     }
 }
+
+export const deleteSession = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { session_id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const session = await (prisma as any).imageLeadResult.findUnique({
+      where: { sessionId: session_id }
+    });
+
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    if (session.userId !== userId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized access to this session' });
+    }
+
+    await (prisma as any).imageLeadResult.delete({
+      where: { sessionId: session_id }
+    });
+
+    return res.json({ success: true, message: 'Visual synthesis session cleared from archives' });
+  } catch (error: any) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+

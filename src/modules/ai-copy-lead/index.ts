@@ -237,4 +237,24 @@ router.get('/results', controller.getResults);
  */
 router.get('/vault/:session_id', controller.getVault);
 
+/**
+ * @swagger
+ * /api/ai/copy-lead/session/{session_id}:
+ *   delete:
+ *     summary: Delete a copy synthesis result session
+ *     tags: [AI Copy Lead]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: session_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Result deleted
+ */
+router.delete('/session/:session_id', controller.deleteResult);
+
 export default router;

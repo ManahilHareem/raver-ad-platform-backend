@@ -129,4 +129,24 @@ router.post('/session', controller.createSession);
 router.get('/vault/:session_id', controller.getVault);
 router.post('/sync', controller.syncVault);
 
+/**
+ * @swagger
+ * /api/ai/image-lead/session/{session_id}:
+ *   delete:
+ *     summary: Delete a visual synthesis session
+ *     tags: [AI Image Lead]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: session_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Session deleted
+ */
+router.delete('/session/:session_id', controller.deleteSession);
+
 export default router;
