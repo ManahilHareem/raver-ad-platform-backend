@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import * as controller from './controller';
+import { authMiddleware } from '../../middleware/auth';
 
 const router = Router();
+
+// Apply authentication to all editor routes
+router.use(authMiddleware);
 
 /**
  * @swagger
@@ -140,5 +144,39 @@ router.post('/export', controller.exportFormats);
  *         description: List of renders
  */
 router.get('/renders/:session_id', controller.getRenders);
+
+/**
+ * @swagger
+ * /api/ai/editor/results:
+ *   get:
+ *     summary: Get all rendered videos for the current user
+ *     tags: [AI Editor]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of editor results
+ */
+router.get('/results', controller.getAllResults);
+
+/**
+ * @swagger
+ * /api/ai/editor/results/{id}:
+ *   delete:
+ *     summary: Delete a rendered video result
+ *     tags: [AI Editor]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Result deleted
+ */
+router.delete('/results/:id', controller.deleteResult);
 
 export default router;

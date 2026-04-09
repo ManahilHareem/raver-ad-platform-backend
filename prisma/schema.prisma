@@ -217,6 +217,7 @@ model EditorResult {
   campaignId   String?
   videoUrl     String?
   format       String?
+  type         String?
   metadata     Json?
   createdAt    DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
