@@ -136,6 +136,40 @@ export const getHistory = async (req: AuthRequest, res: Response): Promise<any> 
 };
 
 /**
+ * Delete (archive) a specific quality report
+ */
+export const deleteReport = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    // Handle potential reportId or internal id
+    const report = await (prisma as any).qualityLeadResult.findFirst({
+      where: {
+        OR: [
+          { id: id.includes('-') && id.length === 36 ? id : undefined },
+          { reportId: id }
+        ].filter(Boolean) as any,
+        userId
+      }
+    });
+
+    if (!report) {
+      return res.status(404).json({ success: false, message: 'Quality report not found or unauthorized' });
+    }
+
+    await (prisma as any).qualityLeadResult.delete({
+      where: { id: report.id }
+    });
+
+    return res.json({ success: true, message: 'Quality report deleted successfully' });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
  * Get unified list of synthesis candidates from disparate agents
  */
 export const getCandidates = async (req: AuthRequest, res: Response): Promise<any> => {

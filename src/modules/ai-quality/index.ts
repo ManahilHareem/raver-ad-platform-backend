@@ -143,4 +143,27 @@ router.post('/score', controller.scoreAsset);
  */
 router.get('/report/:id', controller.getReport);
 
+/**
+ * @swagger
+ * /api/ai/quality/report/{id}:
+ *   delete:
+ *     summary: Delete a specific quality report
+ *     tags: [AI Quality Lead]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The internal database ID or external report_id
+ *     responses:
+ *       200:
+ *         description: Quality report deleted
+ *       404:
+ *         description: Report not found
+ */
+router.delete('/report/:id', controller.deleteReport);
+
 export default router;
