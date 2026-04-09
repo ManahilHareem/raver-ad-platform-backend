@@ -21,6 +21,7 @@ import aiEditorRoutes from './modules/ai-editor';
 import aiProducerRoutes from './modules/ai-producer';
 import aiDirectorRoutes from './modules/ai-director';
 import aiInsightsRoutes from './modules/ai-insights';
+import aiQualityRoutes from './modules/ai-quality';
 import voiceRoutes from './modules/voice';
 import { authMiddleware } from './middleware/auth';
 
@@ -66,5 +67,6 @@ app.use('/api/ai/editor', authMiddleware, aiEditorRoutes);
 app.use('/api/ai/producer', authMiddleware, aiProducerRoutes);
 app.use('/api/ai/director', authMiddleware, aiDirectorRoutes);
 app.use('/api/ai/insights', authMiddleware, aiInsightsRoutes);
+app.use('/api/ai/quality', authMiddleware, aiQualityRoutes);
 
 export default app;

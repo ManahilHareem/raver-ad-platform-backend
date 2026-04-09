@@ -162,6 +162,7 @@ model User {
   paymentMethods    PaymentMethod[]
   projects          Project[]
   producerResults   ProducerResult[]
+  qualityLeadResults QualityLeadResult[]
 }
 
 model ProducerResult {
@@ -223,3 +224,25 @@ model EditorResult {
   updatedAt    DateTime  @default(now()) @db.Timestamptz(6)
   User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model QualityLeadResult {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                  String   @db.Uuid
+  reportId                String   @unique
+  campaignId              String?
+  sessionId               String?
+  visualScore             Float?
+  brandAlignmentScore    Float?
+  copyScore               Float?
+  platformFitScore        Float?
+  audioFitScore           Float?
+  overallScore            Float?
+  decision                String?
+  rejected                Boolean?
+  rejectReason            String?
+  metadata                Json?
+  createdAt               DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime @default(now()) @db.Timestamptz(6)
+  User                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
