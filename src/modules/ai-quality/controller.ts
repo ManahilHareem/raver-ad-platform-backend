@@ -70,19 +70,66 @@ export const getReport = async (req: AuthRequest, res: Response): Promise<any> =
 };
 
 /**
- * List all previous quality results for the user
+ * List all previous quality results for the user, joined with their original assets
  */
 export const getHistory = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const results = await (prisma as any).qualityLeadResult.findMany({
+    // Fetch latest reports
+    const reports = await (prisma as any).qualityLeadResult.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      take: 50
     });
 
-    return res.json({ success: true, data: results });
+    if (reports.length === 0) return res.json({ success: true, data: [] });
+
+    // Extract unique session and campaign IDs for batch lookup
+    const sessionIds = [...new Set(reports.map((r: any) => r.sessionId).filter(Boolean))];
+
+    // Batch fetch candidates from all agent tables
+    const [editors, audios, images, copies, producers, directors] = await Promise.all([
+      (prisma as any).editorResult.findMany({ where: { userId, sessionId: { in: sessionIds } } }),
+      (prisma as any).audioLeadResult.findMany({ where: { userId, sessionId: { in: sessionIds } } }),
+      (prisma as any).imageLeadResult.findMany({ where: { userId, sessionId: { in: sessionIds } } }),
+      (prisma as any).copyLeadResult.findMany({ where: { userId, sessionId: { in: sessionIds } } }),
+      (prisma as any).producerResult.findMany({ where: { userId, sessionId: { in: sessionIds } } }),
+      (prisma as any).aISession.findMany({ where: { userId, sessionId: { in: sessionIds }, type: 'director' } })
+    ]);
+
+    // Create a lookup map for candidates
+    const candidateMap: Record<string, any> = {};
+    
+    editors.forEach((e: any) => { candidateMap[e.sessionId] = { ...e, agentType: 'Editor', label: 'Video Render', url: e.videoUrl }; });
+    audios.forEach((a: any) => { candidateMap[a.sessionId] = { ...a, agentType: 'Audio', label: 'Audio Mix', url: a.mixUrl }; });
+    images.forEach((i: any) => { candidateMap[i.sessionId] = { ...i, agentType: 'Image', label: 'Scene Images', url: i.mainImageUrl }; });
+    copies.forEach((c: any) => { candidateMap[c.sessionId] = { ...c, agentType: 'Copy', label: 'Ad Script', url: null }; });
+    producers.forEach((p: any) => { 
+      candidateMap[p.sessionId] = { 
+        ...p, 
+        agentType: 'Producer', 
+        label: 'Producer Audit', 
+        url: p.result?.video_url || p.result?.videoUrl || p.result?.render_url || p.result?.renderUrl 
+      }; 
+    });
+    directors.forEach((d: any) => { 
+      candidateMap[d.sessionId] = { 
+        ...d, 
+        agentType: 'Director', 
+        label: 'Director Session', 
+        url: d.metadata?.video_url || d.metadata?.videoUrl || d.metadata?.production?.video_url || d.metadata?.production?.videoUrl 
+      }; 
+    });
+
+    // Merge candidates into reports
+    const enrichedReports = reports.map((report: any) => ({
+      ...report,
+      candidate: report.sessionId ? candidateMap[report.sessionId] : null
+    }));
+
+    return res.json({ success: true, data: enrichedReports });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: error.message });
   }
