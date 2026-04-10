@@ -4,6 +4,7 @@ import * as imageLeadService from './service';
 import * as assetService from '../asset/service';
 import prisma from '../../db/prisma';
 import { AuthRequest } from '../../middleware/auth';
+import { createNotification } from '../notification/service';
 
 export const generateImages = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
@@ -81,6 +82,16 @@ export const generateImages = async (req: AuthRequest, res: Response): Promise<a
             }
           });
           console.log(`[ImageLeadController] Persisted local record for ${finalSessionId}`);
+
+          // Trigger notification
+          await createNotification({
+            userId,
+            type: 'AI_IMAGE_GENERATED',
+            title: 'Visual Concepts Generated',
+            message: `AI Image Lead has generated new visual concepts for session "${finalSessionId}".`,
+            link: `https://adplatform.raver.ai/agents/image-lead?sessionId=${finalSessionId}`,
+            metadata: { sessionId: finalSessionId }
+          });
         } catch (dbError) {
           console.error('[ImageLeadController] ImageLeadResult persistence error:', dbError);
         }
@@ -148,6 +159,16 @@ export const enhanceImage = async (req: AuthRequest, res: Response): Promise<any
           }
         });
         console.log(`[ImageLeadController] Updated lead result with enhanced image for session ${finalSessionId}`);
+
+        // Trigger notification
+        await createNotification({
+          userId,
+          type: 'AI_IMAGE_GENERATED',
+          title: 'Image Enhanced',
+          message: `AI Image Lead has successfully enhanced the image for session "${finalSessionId}".`,
+          link: `https://adplatform.raver.ai/agents/image-lead?sessionId=${finalSessionId}`,
+          metadata: { sessionId: finalSessionId }
+        });
       } catch (e) {
         console.error('[ImageLeadController] Failed to update ImageLeadResult with enhanced image:', e);
       }

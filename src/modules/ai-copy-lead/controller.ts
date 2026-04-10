@@ -2,6 +2,7 @@ import { Response } from 'express';
 import * as copyService from './service';
 import prisma from '../../db/prisma';
 import { AuthRequest } from '../../middleware/auth';
+import { createNotification } from '../notification/service';
 
 export const generateScript = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
@@ -20,6 +21,16 @@ export const generateScript = async (req: AuthRequest, res: Response): Promise<a
           script: result,
           metadata: { ...result, brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
+      });
+
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_COPY_GENERATED',
+        title: 'Ad Copy Generated',
+        message: `AI Copy Lead has generated a new ad script and linguistic package for session "${session_id}".`,
+        link: `https://adplatform.raver.ai/agents/copy-lead?sessionId=${session_id}`,
+        metadata: { sessionId: session_id }
       });
     }
 
@@ -47,6 +58,16 @@ export const generateCaptions = async (req: AuthRequest, res: Response): Promise
           metadata: { ...(Array.isArray(result) ? { captions_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
       });
+
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_COPY_GENERATED',
+        title: 'Captions Generated',
+        message: `AI Copy Lead has generated new social media captions for session "${session_id}".`,
+        link: `https://adplatform.raver.ai/agents/copy-lead?sessionId=${session_id}`,
+        metadata: { sessionId: session_id }
+      });
     }
 
     return res.json({ success: true, data: result });
@@ -72,6 +93,16 @@ export const generateOverlays = async (req: AuthRequest, res: Response): Promise
           overlays: result,
           metadata: { ...(Array.isArray(result) ? { overlays_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
+      });
+
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_COPY_GENERATED',
+        title: 'Video Overlays Generated',
+        message: `AI Copy Lead has generated new layout overlays for session "${session_id}".`,
+        link: `https://adplatform.raver.ai/agents/copy-lead?sessionId=${session_id}`,
+        metadata: { sessionId: session_id }
       });
     }
 
@@ -99,6 +130,16 @@ export const generateCta = async (req: AuthRequest, res: Response): Promise<any>
           metadata: { ...(typeof result === 'object' ? result : { cta_text: result }), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
       });
+
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_COPY_GENERATED',
+        title: 'CTA Variants Generated',
+        message: `AI Copy Lead has generated new high-conversion call-to-action variants for session "${session_id}".`,
+        link: `https://adplatform.raver.ai/agents/copy-lead?sessionId=${session_id}`,
+        metadata: { sessionId: session_id }
+      });
     }
 
     return res.json({ success: true, data: result });
@@ -124,6 +165,16 @@ export const generateHashtags = async (req: AuthRequest, res: Response): Promise
           hashtags: result,
           metadata: { ...(Array.isArray(result) ? { hashtags_list: result } : result), brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
+      });
+
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_COPY_GENERATED',
+        title: 'Social Hashtags Generated',
+        message: `AI Copy Lead has generated trending hashtag sets for session "${session_id}".`,
+        link: `https://adplatform.raver.ai/agents/copy-lead?sessionId=${session_id}`,
+        metadata: { sessionId: session_id }
       });
     }
 
@@ -154,6 +205,15 @@ export const produceCopy = async (req: AuthRequest, res: Response): Promise<any>
         }
       });
 
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_COPY_GENERATED',
+        title: 'Full Copy Package Ready',
+        message: `AI Copy Lead has finalized the full linguistic synthesis package for session "${session_id}".`,
+        link: `https://adplatform.raver.ai/agents/copy-lead?sessionId=${session_id}`,
+        metadata: { sessionId: session_id }
+      });
     }
 
     return res.json({ success: true, data: result });

@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../../db/prisma';
 import { AuthRequest } from '../../middleware/auth';
 import * as qualityService from './service';
+import { createNotification } from '../notification/service';
 
 /**
  * Score an asset for quality
@@ -31,6 +32,17 @@ export const scoreAsset = async (req: AuthRequest, res: Response): Promise<any> 
         rejectReason: result.reject_reason,
         metadata: result
       }
+    });
+
+
+    // Trigger notification
+    await createNotification({
+      userId,
+      type: 'AI_QUALITY_SCORED',
+      title: 'Forensic Audit Completed',
+      message: `AI Quality Lead has completed a forensic audit for campaign "${qualityReport.campaignId}". Decision: ${qualityReport.decision}.`,
+      link: `https://adplatform.raver.ai/agents/quality?sessionId=${qualityReport.sessionId || ''}`,
+      metadata: { reportId: qualityReport.id, decision: qualityReport.decision }
     });
 
     return res.json({ success: true, data: qualityReport });

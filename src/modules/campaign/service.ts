@@ -1,4 +1,5 @@
 import prisma from '../../db/prisma';
+import { createNotification } from '../notification/service';
 
 const isValidCampaignId = (id: string) => {
   return typeof id === 'string' && id.length > 0;
@@ -36,7 +37,7 @@ export const createCampaign = async (data: any) => {
   }
 
   try {
-    return await prisma.campaign.create({
+    const campaign = await prisma.campaign.create({
       data: {
         userId: data.userId,
         name: data.name,
@@ -53,6 +54,17 @@ export const createCampaign = async (data: any) => {
         config: data.config
       }
     });
+
+    // Trigger notification
+    await createNotification({
+      userId: data.userId,
+      type: 'CAMPAIGN_CREATED',
+      title: 'New Campaign Created',
+      message: `Your campaign "${campaign.name}" has been successfully created as a draft.`,
+      metadata: { campaignId: campaign.id, campaignName: campaign.name }
+    });
+
+    return campaign;
   } catch (error) {
     console.error('Error creating campaign:', error);
     throw new Error('Campaign creation failed.');
@@ -62,10 +74,21 @@ export const createCampaign = async (data: any) => {
 export const updateCampaign = async (id: string, data: any) => {
   if (!isValidCampaignId(id)) throw new Error('Invalid Campaign ID format');
   try {
-    return await prisma.campaign.update({
+    const campaign = await prisma.campaign.update({
       where: { id },
       data
     });
+
+    // Trigger notification
+    await createNotification({
+      userId: campaign.userId,
+      type: 'CAMPAIGN_UPDATED',
+      title: 'Campaign Updated',
+      message: `The campaign "${campaign.name}" has been updated.`,
+      metadata: { campaignId: campaign.id, campaignName: campaign.name }
+    });
+
+    return campaign;
   } catch (error) {
     console.error(`Error updating campaign ID (${id}):`, error);
     throw new Error('Campaign update failed.');
@@ -75,6 +98,20 @@ export const updateCampaign = async (id: string, data: any) => {
 export const deleteCampaign = async (id: string) => {
   if (!isValidCampaignId(id)) throw new Error('Invalid Campaign ID format');
   try {
+    // Fetch campaign details before deletion for notification
+    const campaign = await prisma.campaign.findUnique({ where: { id } });
+
+    if (campaign) {
+      await createNotification({
+        userId: campaign.userId,
+        type: 'CAMPAIGN_DELETED',
+        title: 'Campaign Deleted',
+        message: `The campaign "${campaign.name}" and all its associated assets have been deleted.`,
+        link: `https://adplatform.raver.ai/dashboard/projects`,
+        metadata: { campaignId: id, campaignName: campaign.name }
+      });
+    }
+
     // 1. Manually clean up associated records that don't have automatic Cascade Delete
     
     // Delete metrics (Prisma should handle this, but being explicit doesn't hurt)

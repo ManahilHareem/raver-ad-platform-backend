@@ -82,6 +82,9 @@ router.post('/', userController.createUser);
  *                       type: string
  *                     bio:
  *                       type: string
+ *                     webhookUrl:
+ *                       type: string
+ *                       description: Optional URL for outbound notification webhooks
  */
 router.get('/me', userController.getMe);
 

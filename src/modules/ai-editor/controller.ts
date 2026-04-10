@@ -2,6 +2,7 @@ import { Response } from 'express';
 import * as editorService from './service';
 import prisma from '../../db/prisma';
 import { AuthRequest } from '../../middleware/auth';
+import { createNotification } from '../notification/service';
 
 export const renderCampaign = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
@@ -46,6 +47,15 @@ export const renderCampaign = async (req: AuthRequest, res: Response): Promise<a
           type: 'render',
           metadata
         }
+      });
+
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_EDITOR_RENDERED',
+        title: 'Video Render Completed',
+        message: `AI Editor has completed the video render for session "${sessionId}".`,
+        metadata: { sessionId }
       });
     }
 
@@ -104,6 +114,16 @@ export const exportFormats = async (req: AuthRequest, res: Response): Promise<an
           type: 'export',
           metadata
         }
+      });
+
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_EDITOR_RENDERED',
+        title: 'Video Multi-Format Export Completed',
+        message: `AI Editor has successfully exported multiple video formats for session "${sessionId}".`,
+        link: `https://adplatform.raver.ai/agents/editor?sessionId=${sessionId}`,
+        metadata: { sessionId }
       });
     }
 

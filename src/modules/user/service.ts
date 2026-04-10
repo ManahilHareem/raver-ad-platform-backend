@@ -10,7 +10,7 @@ export const getAllUsers = async () => {
       id: true, email: true, fullName: true, professionalRole: true, bio: true, 
       avatarUrl: true, instagram: true, facebook: true, twitter: true, linkedin: true, 
       website: true, campaignUpdates: true, aiInsights: true, teamActivity: true, 
-      weeklySummary: true, createdAt: true 
+      weeklySummary: true, webhookUrl: true, createdAt: true 
     } 
   });
 };
@@ -23,7 +23,7 @@ export const getUserById = async (id: string) => {
       id: true, email: true, fullName: true, professionalRole: true, bio: true, 
       avatarUrl: true, instagram: true, facebook: true, twitter: true, linkedin: true, 
       website: true, campaignUpdates: true, aiInsights: true, teamActivity: true, 
-      weeklySummary: true, createdAt: true 
+      weeklySummary: true, webhookUrl: true, createdAt: true 
     }
   });
 };
@@ -36,7 +36,7 @@ export const getMe = async (id?: string) => {
       id: true, email: true, fullName: true, professionalRole: true, bio: true, 
       avatarUrl: true, instagram: true, facebook: true, twitter: true, linkedin: true, 
       website: true, campaignUpdates: true, aiInsights: true, teamActivity: true, 
-      weeklySummary: true, createdAt: true 
+      weeklySummary: true, webhookUrl: true, createdAt: true 
     }
   });
 };
@@ -62,7 +62,7 @@ export const updateUser = async (id: string, data: any) => {
   const allowedFields = [
     'fullName', 'professionalRole', 'bio', 'avatarUrl', 
     'instagram', 'facebook', 'twitter', 'linkedin', 'website',
-    'campaignUpdates', 'aiInsights', 'teamActivity', 'weeklySummary'
+    'campaignUpdates', 'aiInsights', 'teamActivity', 'weeklySummary', 'webhookUrl'
   ];
   const filteredData: any = {};
   
@@ -79,7 +79,7 @@ export const updateUser = async (id: string, data: any) => {
       id: true, email: true, fullName: true, professionalRole: true, bio: true, 
       avatarUrl: true, instagram: true, facebook: true, twitter: true, linkedin: true, 
       website: true, campaignUpdates: true, aiInsights: true, teamActivity: true, 
-      weeklySummary: true, createdAt: true 
+      weeklySummary: true, webhookUrl: true, createdAt: true 
     }
   });
 };

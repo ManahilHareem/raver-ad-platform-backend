@@ -2,6 +2,7 @@ import { Response } from 'express';
 import * as audioService from './service';
 import prisma from '../../db/prisma';
 import { AuthRequest } from '../../middleware/auth';
+import { createNotification } from '../notification/service';
 
 export const generateMusic = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
@@ -28,6 +29,14 @@ export const generateMusic = async (req: AuthRequest, res: Response): Promise<an
         }
       });
 
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_AUDIO_GENERATED',
+        title: 'Audio Asset Generated',
+        message: `AI Audio Lead has successfully generated an audio asset for session "${session_id}".`,
+        metadata: { sessionId: session_id }
+      });
     }
 
     return res.json({ success: true, data: result });
@@ -61,6 +70,15 @@ export const generateVoiceover = async (req: AuthRequest, res: Response): Promis
         }
       });
 
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_AUDIO_GENERATED',
+        title: 'Voiceover Generated',
+        message: `AI Audio Lead has successfully generated a voiceover for session "${session_id}".`,
+        link: `https://adplatform.raver.ai/agents/audio-lead?sessionId=${session_id}`,
+        metadata: { sessionId: session_id }
+      });
     }
 
     return res.json({ success: true, data: result });
@@ -98,7 +116,15 @@ export const produceAudio = async (req: AuthRequest, res: Response): Promise<any
         }
       });
 
-
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_AUDIO_GENERATED',
+        title: 'Audio Assets Compiled',
+        message: `AI Audio Lead has synchronized music and voiceover assets for session "${session_id}".`,
+        link: `https://adplatform.raver.ai/agents/audio-lead?sessionId=${session_id}`,
+        metadata: { sessionId: session_id }
+      });
     }
 
     return res.json({ success: true, data: result });
@@ -130,6 +156,15 @@ export const mixAudio = async (req: AuthRequest, res: Response): Promise<any> =>
           mixUrl: result.mix_url,
           metadata: { ...result, brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
+      });
+
+      // Trigger notification
+      await createNotification({
+        userId,
+        type: 'AI_AUDIO_GENERATED',
+        title: 'Audio Mix Completed',
+        message: `AI Audio Lead has completed the full audio mix for session "${session_id}".`,
+        metadata: { sessionId: session_id }
       });
     }
 

@@ -23,6 +23,7 @@ import aiDirectorRoutes from './modules/ai-director';
 import aiInsightsRoutes from './modules/ai-insights';
 import aiQualityRoutes from './modules/ai-quality';
 import voiceRoutes from './modules/voice';
+import notificationRoutes from './modules/notification';
 import { authMiddleware } from './middleware/auth';
 
 const app = express();
@@ -58,6 +59,7 @@ app.use('/api/templates', authMiddleware, templateRoutes);
 app.use('/api/agents', authMiddleware, agentRoutes);
 app.use('/api/chat', authMiddleware, chatRoutes);
 app.use('/api/voice', authMiddleware, voiceRoutes);
+app.use('/api/notifications', authMiddleware, notificationRoutes);
 // AI Proxy Routes
 app.use('/api/ai/ads', authMiddleware, aiAdsRoutes);
 app.use('/api/ai/image-lead', authMiddleware, aiImageLeadRoutes);

@@ -2,6 +2,7 @@ import { Response } from 'express';
 import * as producerService from './service';
 import prisma from '../../db/prisma';
 import { AuthRequest } from '../../middleware/auth';
+import { createNotification } from '../notification/service';
 
 export const launchCampaign = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
@@ -26,6 +27,16 @@ export const launchCampaign = async (req: AuthRequest, res: Response): Promise<a
             brief: req.body.brief,
             result: result
           }
+        });
+
+        // Trigger notification
+        await createNotification({
+          userId,
+          type: 'AI_PRODUCER_LAUNCHED',
+          title: 'Campaign Production Launched',
+          message: `AI Producer has successfully launched the production for campaign "${req.body.brief?.business_name || 'New Campaign'}".`,
+          link: `https://adplatform.raver.ai/dashboard/projects?campaignId=${result.campaign_id}`,
+          metadata: { campaignId: result.campaign_id, status: result.status }
         });
       } catch (dbError) {
         console.error('[AIProducerController] ProducerResult persistence error:', dbError);
@@ -159,6 +170,18 @@ export const approveCampaign = async (req: AuthRequest, res: Response): Promise<
             await (prisma as any).campaign.update({
                 where: { id: campaign_id },
                 data: { status: status }
+            });
+
+            // Trigger notification
+            await createNotification({
+                userId,
+                type: status === 'approved' ? 'AI_PRODUCER_APPROVED' : 'AI_PRODUCER_REJECTED',
+                title: status === 'approved' ? 'Production Approved' : 'Production Rejected',
+                message: status === 'approved' 
+                    ? `Your campaign production for "${campaign_id}" has been approved.`
+                    : `Your campaign production for "${campaign_id}" has been rejected.`,
+                link: `https://adplatform.raver.ai/dashboard/projects?campaignId=${campaign_id}`,
+                metadata: { campaignId: campaign_id, status }
             });
         } catch (dbError) {
             console.error('[AIProducerController] Approval sync error:', dbError);

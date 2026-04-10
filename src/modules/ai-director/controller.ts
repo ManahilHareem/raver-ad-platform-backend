@@ -2,6 +2,7 @@ import { Response } from 'express';
 import * as directorService from './service';
 import prisma from '../../db/prisma';
 import { AuthRequest } from '../../middleware/auth';
+import { createNotification } from '../notification/service';
 
 /**
  * Helper to safely merge existing metadata with new results from the AI service.
@@ -151,6 +152,15 @@ export const approveSession = async (req: AuthRequest, res: Response): Promise<a
             console.error('[AIDirectorController] Campaign status update failed:', dbError);
           }
         }
+
+        // Trigger notification
+        await createNotification({
+            userId,
+            type: 'AI_DIRECTOR_APPROVED',
+            title: 'Director Session Approved',
+            message: `Your AI Director session ${session_id} has been approved and campaign status updated.`,
+            metadata: { sessionId: session_id }
+        });
         
         result = updatedSession;
       }
@@ -316,6 +326,19 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
       }
 
       const campaignIdToSave = result.campaign_id || (typeof session_id === 'string' && !session_id.includes('_') ? session_id : (existing?.campaignId || null));
+
+      // Detect shift to ready_for_human_review and notify
+      const oldStatus = existing?.metadata ? (existing.metadata as any).status || (existing.metadata as any).production?.status : null;
+      if (result.status === 'ready_for_human_review' && oldStatus !== 'ready_for_human_review') {
+        await createNotification({
+          userId,
+          type: 'AI_DIRECTOR_READY',
+          title: 'Director Production Ready',
+          message: `Your AI Director session for "${session_id}" is now complete and ready for your review.`,
+          link: `https://adplatform.raver.ai/agents/director?sessionId=${session_id}`,
+          metadata: { sessionId: session_id, campaignId: campaignIdToSave }
+        });
+      }
 
       await (prisma as any).aISession.upsert({
         where: { sessionId: session_id as string },

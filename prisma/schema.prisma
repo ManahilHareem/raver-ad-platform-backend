@@ -150,6 +150,7 @@ model User {
   campaignUpdates   Boolean           @default(true)
   teamActivity      Boolean           @default(true)
   weeklySummary     Boolean           @default(true)
+  webhookUrl        String?
   aiSessions        AISession[]
   agents            Agent[]
   assets            Asset[]
@@ -163,6 +164,7 @@ model User {
   projects          Project[]
   producerResults   ProducerResult[]
   qualityLeadResults QualityLeadResult[]
+  notifications     Notification[]
 }
 
 model ProducerResult {
@@ -244,5 +246,18 @@ model QualityLeadResult {
   createdAt               DateTime @default(now()) @db.Timestamptz(6)
   updatedAt               DateTime @default(now()) @db.Timestamptz(6)
   User                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  type      String
+  title     String
+  message   String
+  link      String?
+  metadata  Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
