@@ -5,15 +5,93 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export const getAllAssets = async (userId: string) => {
   try {
-    const assets = await prisma.asset.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-    console.log(`[AssetService] Found ${assets.length} assets for user ${userId}`);
-    return assets;
+    // 1. Fetch from diverse source tables
+    const [standardAssets, images, audios, editors, producers] = await Promise.all([
+      prisma.asset.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+      (prisma as any).imageLeadResult.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+      (prisma as any).audioLeadResult.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+      (prisma as any).editorResult.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+      (prisma as any).producerResult.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+    ]);
+
+    // 2. Normalize agent results into Asset objects
+    const aiAssets: any[] = [
+      ...images.filter((i: any) => i.mainImageUrl).map((i: any) => ({
+        id: i.id,
+        userId: i.userId,
+        campaignId: i.campaignId,
+        type: 'image',
+        name: `AI Scene - ${i.sessionId}`,
+        url: i.mainImageUrl,
+        createdAt: i.createdAt,
+        origin: 'AI Image Lead'
+      })),
+      ...audios.flatMap((a: any) => {
+        const variations = [];
+        if (a.mixUrl) variations.push({
+          id: `${a.id}-mix`,
+          userId: a.userId,
+          campaignId: a.campaignId,
+          type: 'audio',
+          name: `AI Mix - ${a.sessionId}`,
+          url: a.mixUrl,
+          createdAt: a.createdAt,
+          origin: 'AI Audio Lead'
+        });
+        if (a.voiceoverUrl) variations.push({
+          id: `${a.id}-voice`,
+          userId: a.userId,
+          campaignId: a.campaignId,
+          type: 'audio',
+          name: `AI Voiceover - ${a.sessionId}`,
+          url: a.voiceoverUrl,
+          createdAt: a.createdAt,
+          origin: 'AI Audio Lead'
+        });
+        if (a.musicUrl) variations.push({
+          id: `${a.id}-music`,
+          userId: a.userId,
+          campaignId: a.campaignId,
+          type: 'audio',
+          name: `AI Music - ${a.sessionId}`,
+          url: a.musicUrl,
+          createdAt: a.createdAt,
+          origin: 'AI Audio Lead'
+        });
+        return variations;
+      }),
+      ...editors.filter((e: any) => e.videoUrl).map((e: any) => ({
+        id: e.id,
+        userId: e.userId,
+        campaignId: e.campaignId,
+        type: 'video',
+        name: `AI Render - ${e.sessionId}`,
+        url: e.videoUrl,
+        createdAt: e.createdAt,
+        origin: 'AI Editor'
+      })),
+      ...producers.filter((p: any) => p.result && (p.result.video_url || p.result.videoUrl)).map((p: any) => ({
+        id: p.id,
+        userId: p.userId,
+        campaignId: p.campaignId,
+        type: 'video',
+        name: `Production Export - ${p.sessionId}`,
+        url: p.result.video_url || p.result.videoUrl,
+        createdAt: p.createdAt,
+        origin: 'AI Producer'
+      }))
+    ];
+
+    // 3. Combine and sort
+    const allAssets = [...standardAssets, ...aiAssets].sort((a: any, b: any) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    console.log(`[AssetService] Found ${standardAssets.length} standard assets and ${aiAssets.length} AI assets for user ${userId}`);
+    return allAssets;
   } catch (error) {
-    console.error('[AssetService] Error fetching assets for user:', userId, error);
-    throw new Error('Could not fetch assets from database.');
+    console.error('[AssetService] Error fetching combined assets for user:', userId, error);
+    throw new Error('Could not fetch combined assets from database.');
   }
 };
 

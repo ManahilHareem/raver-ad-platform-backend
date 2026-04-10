@@ -46,7 +46,7 @@ const detectVoice = (message: string): string | null => {
 export const chat = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const userId = req.user?.id;
-    const { session_id, campaign_id, message } = req.body;
+    const { session_id, campaign_id, message, assets } = req.body;
     const lookupId = session_id || campaign_id;
 
     if (!userId) {
@@ -65,7 +65,11 @@ export const chat = async (req: AuthRequest, res: Response): Promise<any> => {
     }
 
     // 2. Append User Message
-    const userMessage = { role: 'user', content: message || req.body.content };
+    const userMessage = { 
+      role: 'user', 
+      content: message || req.body.content,
+      assets: assets || [] 
+    };
     const updatedHistory = [...existingHistory, userMessage];
 
     // 3. Request AI response
@@ -88,6 +92,12 @@ export const chat = async (req: AuthRequest, res: Response): Promise<any> => {
 
     if (finalId) {
       const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
+      
+      // Explicitly track the assets in metadata if provided
+      if (assets) {
+        merged.assets = assets;
+      }
+
       await (prisma as any).aISession.upsert({
         where: { sessionId: finalId },
         update: { metadata: merged, type: 'director', campaignId: campaignIdToSave },
@@ -101,7 +111,7 @@ export const chat = async (req: AuthRequest, res: Response): Promise<any> => {
       });
     }
 
-    return res.json({ success: true, data: { ...result, history: finalHistory } });
+    return res.json({ success: true, data: { ...result, history: finalHistory, assets } });
   } catch (error: any) {
     console.error('[AIDirectorController] Chat Error:', error);
     return res.status(error.status || 500).json({ success: false, message: error.message });
