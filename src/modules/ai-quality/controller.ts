@@ -114,16 +114,60 @@ export const getHistory = async (req: AuthRequest, res: Response): Promise<any> 
     // Create a lookup map for candidates
     const candidateMap: Record<string, any> = {};
     
-    editors.forEach((e: any) => { candidateMap[e.sessionId] = { ...e, agentType: 'Editor', label: 'Video Render', url: e.videoUrl }; });
-    audios.forEach((a: any) => { candidateMap[a.sessionId] = { ...a, agentType: 'Audio', label: 'Audio Mix', url: a.mixUrl }; });
-    images.forEach((i: any) => { candidateMap[i.sessionId] = { ...i, agentType: 'Image', label: 'Scene Images', url: i.mainImageUrl }; });
-    copies.forEach((c: any) => { candidateMap[c.sessionId] = { ...c, agentType: 'Copy', label: 'Ad Script', url: null }; });
+    editors.forEach((e: any) => { 
+      candidateMap[e.sessionId] = { 
+        ...e, 
+        agentType: 'Editor', 
+        label: 'Video Render', 
+        url: e.videoUrl,
+        metadata: e.metadata 
+      }; 
+    });
+    audios.forEach((a: any) => { 
+      candidateMap[a.sessionId] = { 
+        ...a, 
+        agentType: 'Audio', 
+        label: 'Audio Mix', 
+        url: a.mixUrl,
+        musicUrl: a.musicUrl,
+        voiceoverUrl: a.voiceoverUrl,
+        metadata: a.metadata
+      }; 
+    });
+    images.forEach((i: any) => { 
+      candidateMap[i.sessionId] = { 
+        ...i, 
+        agentType: 'Image', 
+        label: 'Scene Images', 
+        url: i.mainImageUrl,
+        mainImageUrl: i.mainImageUrl,
+        scenes: i.scenes,
+        metadata: i.metadata
+      }; 
+    });
+    copies.forEach((c: any) => { 
+      candidateMap[c.sessionId] = { 
+        ...c, 
+        agentType: 'Copy', 
+        label: 'Ad Script', 
+        url: null,
+        script: c.script,
+        captions: c.captions,
+        overlays: c.overlays,
+        cta: c.cta,
+        hashtags: c.hashtags,
+        metadata: c.metadata
+      }; 
+    });
     producers.forEach((p: any) => { 
       candidateMap[p.sessionId] = { 
         ...p, 
         agentType: 'Producer', 
         label: 'Producer Audit', 
-        url: p.result?.video_url || p.result?.videoUrl || p.result?.render_url || p.result?.renderUrl 
+        url: p.result?.video_url || p.result?.videoUrl || p.result?.render_url || p.result?.renderUrl,
+        brief: p.brief,
+        status: p.status,
+        result: p.result
       }; 
     });
     directors.forEach((d: any) => { 
@@ -131,7 +175,8 @@ export const getHistory = async (req: AuthRequest, res: Response): Promise<any> 
         ...d, 
         agentType: 'Director', 
         label: 'Director Session', 
-        url: d.metadata?.video_url || d.metadata?.videoUrl || d.metadata?.production?.video_url || d.metadata?.production?.videoUrl 
+        url: d.metadata?.video_url || d.metadata?.videoUrl || d.metadata?.production?.video_url || d.metadata?.production?.videoUrl,
+        metadata: d.metadata 
       }; 
     });
 
@@ -210,6 +255,7 @@ export const getCandidates = async (req: AuthRequest, res: Response): Promise<an
         type: 'Editor', 
         label: 'Video Render', 
         url: e.videoUrl, 
+        metadata: e.metadata,
         createdAt: e.createdAt,
         raw: e
       })),
@@ -220,6 +266,9 @@ export const getCandidates = async (req: AuthRequest, res: Response): Promise<an
         type: 'Audio', 
         label: 'Audio Mix', 
         url: a.mixUrl, 
+        musicUrl: a.musicUrl,
+        voiceoverUrl: a.voiceoverUrl,
+        metadata: a.metadata,
         createdAt: a.createdAt,
         raw: a
       })),
@@ -230,6 +279,9 @@ export const getCandidates = async (req: AuthRequest, res: Response): Promise<an
         type: 'Image', 
         label: 'Scene Images', 
         url: i.mainImageUrl, 
+        mainImageUrl: i.mainImageUrl,
+        scenes: i.scenes,
+        metadata: i.metadata,
         createdAt: i.createdAt,
         raw: i
       })),
@@ -240,6 +292,12 @@ export const getCandidates = async (req: AuthRequest, res: Response): Promise<an
         type: 'Copy', 
         label: 'Ad Script', 
         url: null, 
+        script: c.script,
+        captions: c.captions,
+        overlays: c.overlays,
+        cta: c.cta,
+        hashtags: c.hashtags,
+        metadata: c.metadata,
         createdAt: c.createdAt,
         raw: c
       })),
@@ -250,6 +308,9 @@ export const getCandidates = async (req: AuthRequest, res: Response): Promise<an
         type: 'Producer',
         label: 'Producer Audit',
         url: p.result?.video_url || p.result?.videoUrl || p.result?.render_url || p.result?.renderUrl,
+        brief: p.brief,
+        status: p.status,
+        result: p.result,
         createdAt: p.createdAt,
         raw: p
       })),
@@ -260,6 +321,7 @@ export const getCandidates = async (req: AuthRequest, res: Response): Promise<an
         type: 'Director',
         label: 'Director Session',
         url: d.metadata?.video_url || d.metadata?.videoUrl || d.metadata?.production?.video_url || d.metadata?.production?.videoUrl,
+        metadata: d.metadata,
         createdAt: d.createdAt,
         raw: d
       }))
