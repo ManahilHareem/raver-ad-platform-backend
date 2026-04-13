@@ -65,3 +65,49 @@ export const executeAgent = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Failed to execute agent' });
   }
 };
+
+import { AuthRequest } from '../../middleware/auth';
+import prisma from '../../db/prisma';
+
+export const getAgentTaskCounts = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const [
+      directorTasks,
+      producerTasks,
+      imageLeadTasks,
+      copyLeadTasks,
+      audioLeadTasks,
+      editorTasks,
+      qualityLeadTasks
+    ] = await Promise.all([
+      prisma.aISession.count({ where: { userId } }),
+      prisma.producerResult.count({ where: { userId } }),
+      prisma.imageLeadResult.count({ where: { userId } }),
+      prisma.copyLeadResult.count({ where: { userId } }),
+      prisma.audioLeadResult.count({ where: { userId } }),
+      prisma.editorResult.count({ where: { userId } }),
+      prisma.qualityLeadResult.count({ where: { userId } })
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        "Raver Director": directorTasks,
+        "Raver Producer": producerTasks,
+        "Raver Image Lead": imageLeadTasks,
+        "Raver Copy Lead": copyLeadTasks,
+        "Raver Audio Lead": audioLeadTasks,
+        "Raver Editor": editorTasks,
+        "Raver Quality Lead": qualityLeadTasks
+      }
+    });
+  } catch (error: any) {
+    console.error('[AgentController] Error fetching task counts:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch agent task counts' });
+  }
+};

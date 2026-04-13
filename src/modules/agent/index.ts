@@ -26,6 +26,20 @@ router.get('/', agentController.getAgents);
 
 /**
  * @swagger
+ * /api/agents/task-counts:
+ *   get:
+ *     summary: Get completed tasks mapped by agent name
+ *     tags: [Agents]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Task counts mapped to each individual AI agent
+ */
+router.get('/task-counts', agentController.getAgentTaskCounts);
+
+/**
+ * @swagger
  * /api/agents:
  *   post:
  *     summary: Create an agent
