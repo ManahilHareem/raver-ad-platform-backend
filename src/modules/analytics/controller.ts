@@ -235,20 +235,50 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
     const thirtyDaysAgo = new Date(now);
     thirtyDaysAgo.setDate(now.getDate() - 29);
 
-    const allGeneratedItems = [
-      ...imageResults.map(r => ({ type: 'image', createdAt: r.createdAt })),
-      ...audioResults.map(r => ({ type: 'audio', createdAt: r.createdAt })),
-      ...copyResults.map(r => ({ type: 'copy', createdAt: r.createdAt })),
-      ...editorResults.map(r => ({ type: 'video', createdAt: r.createdAt })),
-    ].filter(item => item.createdAt >= thirtyDaysAgo);
+    const allGeneratedItems: { type: string, dateObj: Date }[] = [];
+
+    // Parse image results (accounting for multiple scenes + main image)
+    imageResults.forEach(r => {
+      const dateObj = r.updatedAt || r.createdAt;
+      // Main image
+      if (r.mainImageUrl) {
+        allGeneratedItems.push({ type: 'image', dateObj });
+      }
+      // Scenes
+      if (r.scenes && Array.isArray(r.scenes)) {
+        r.scenes.forEach((scene: any) => {
+          if (scene.url && scene.url !== r.mainImageUrl) {
+             allGeneratedItems.push({ type: 'image', dateObj });
+          }
+        });
+      }
+    });
+
+    // Parse audio (mix+voice+music variations sum up)
+    audioResults.forEach(r => {
+      const dateObj = r.updatedAt || r.createdAt;
+      if (r.mixUrl) allGeneratedItems.push({ type: 'audio', dateObj });
+      if (r.voiceoverUrl) allGeneratedItems.push({ type: 'audio', dateObj });
+      if (r.musicUrl) allGeneratedItems.push({ type: 'audio', dateObj });
+    });
+
+    // Parse standard assets, copy, video
+    assets.forEach(a => allGeneratedItems.push({ type: a.type || 'upload', dateObj: a.createdAt }));
+    copyResults.forEach(r => allGeneratedItems.push({ type: 'copy', dateObj: r.updatedAt || r.createdAt }));
+    editorResults.forEach(r => allGeneratedItems.push({ type: 'video', dateObj: r.updatedAt || r.createdAt }));
+    producerResults.filter((p: any) => p.result && (p.result.video_url || p.result.videoUrl)).forEach(r => allGeneratedItems.push({ type: 'video', dateObj: r.updatedAt || r.createdAt }));
+
+    const filteredItems = allGeneratedItems.filter(item => item.dateObj >= thirtyDaysAgo);
 
     const generationTimeline = Array.from({ length: 30 }, (_, i) => {
       const date = new Date(thirtyDaysAgo);
       date.setDate(thirtyDaysAgo.getDate() + i);
       const dayStr = date.toISOString().split('T')[0];
-      const dayItems = allGeneratedItems.filter(
-        item => item.createdAt.toISOString().split('T')[0] === dayStr
+      
+      const dayItems = filteredItems.filter(
+        item => item.dateObj.toISOString().split('T')[0] === dayStr
       );
+      
       return {
         date: dayStr,
         label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -256,6 +286,7 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
         audio: dayItems.filter(i => i.type === 'audio').length,
         copy: dayItems.filter(i => i.type === 'copy').length,
         video: dayItems.filter(i => i.type === 'video').length,
+        uploads: dayItems.filter(i => !['image', 'audio', 'copy', 'video'].includes(i.type)).length,
         total: dayItems.length
       };
     });
