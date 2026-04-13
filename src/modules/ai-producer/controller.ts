@@ -8,7 +8,7 @@ export const launchCampaign = async (req: AuthRequest, res: Response): Promise<a
   try {
     const userId = req.user?.id;
     const result = await producerService.launchCampaign(req.body);
-    
+
     // 1. Persist to dedicated ProducerResult table
     if (userId && result.campaign_id) {
       try {
@@ -62,7 +62,7 @@ export const getCampaign = async (req: AuthRequest, res: Response): Promise<any>
       result = await producerService.getCampaign(campaign_id as string);
     } catch (proxyError: any) {
       console.warn(`[AIProducerController] External lookup failed for ${campaign_id}, checking local fallback.`);
-      
+
       // Special Auto-Seeding for specific test campaigns requested by user
       const testIds = ['29440e40-6401-4b6d-9b42-baf6061950c3', '8b20b09f-cfdd-4568-b46f-8ea4bcc89f7c'];
       if (testIds.includes(campaign_id as string) && userId) {
@@ -90,7 +90,7 @@ export const getCampaign = async (req: AuthRequest, res: Response): Promise<any>
               campaignId: campaign_id,
               status: 'approved',
               brief: { business_name: 'Raver AI Sample', product_description: 'An approved production' },
-              result: { 
+              result: {
                 video_url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
                 status: 'completed',
                 campaign_id: campaign_id
@@ -113,75 +113,101 @@ export const getCampaign = async (req: AuthRequest, res: Response): Promise<any>
         console.log(`[AIProducerController] Serving local fallback for campaign ${campaign_id}`);
         return res.json({ success: true, data: localRecord.result || localRecord });
       }
-      
+
       // If neither external nor local exists, return the error
-      return res.status(proxyError.status || 500).json({ 
-        success: false, 
-        message: proxyError.message || 'Campaign not found' 
+      return res.status(proxyError.status || 500).json({
+        success: false,
+        message: proxyError.message || 'Campaign not found'
       });
     }
-    
+
     // 2. Sync to dedicated ProducerResult table (continuing if proxy hit was successful)
     if (userId && result.campaign_id) {
-        const isMissing = result.message?.includes('No active campaign') || (result.status === null && result.campaign_id === null) || (!result.brief && !result.id);
-        if (isMissing) {
-            console.log(`[AIProducerController] Skipping persistence for inactive/empty campaign ${campaign_id}`);
-            return res.json({ success: true, data: result });
+      const isMissing = result.message?.includes('No active campaign') || (result.status === null && result.campaign_id === null) || (!result.brief && !result.id);
+      if (isMissing) {
+        console.log(`[AIProducerController] Skipping persistence for inactive/empty campaign ${campaign_id}`);
+        return res.json({ success: true, data: result });
+      }
+
+      try {
+        // 1. Fetch current local state of the production
+        const localResult = await (prisma as any).producerResult.findUnique({ where: { campaignId: result.campaign_id } });
+        const localCampaign = await (prisma as any).campaign.findUnique({ where: { id: result.campaign_id } });
+
+        // 2. Terminal state protection: If local status is already 'approved' or 'rejected',
+        // background sync should NOT "downgrade" the status.
+        const terminalStatuses = ['approved', 'rejected', 'live', 'complete'];
+        const finalized = localResult && terminalStatuses.includes(localResult.status);
+        const statusToSync = finalized ? localResult.status : result.status;
+
+        // 3. Upsert ProducerResult
+        await (prisma as any).producerResult.upsert({
+          where: { campaignId: result.campaign_id },
+          create: {
+            userId,
+            campaignId: result.campaign_id,
+            brief: result.brief,
+            status: statusToSync,
+            result: result
+          },
+          update: {
+            status: statusToSync,
+            result: result
+          }
+        });
+
+        // 4. Trigger notification on status change
+        if (localResult && localResult.status !== statusToSync) {
+            let title = 'Production Update';
+            let message = `Campaign "${result.brief?.business_name || 'AI Production'}" is now ${statusToSync}.`;
+            
+            if (statusToSync === 'ready_for_human_review') {
+                title = 'Production Ready for Review';
+                message = `AI Producer has finished generating your campaign for "${result.brief?.business_name || 'Campaign'}". Check it out for final approval!`;
+            } else if (statusToSync === 'failed') {
+                title = 'Production Failed';
+                message = `Unfortunately, the production for "${result.brief?.business_name || 'Campaign'}" encountered an error.`;
+            } else if (statusToSync === 'processing') {
+                title = 'Production Processing';
+                message = `The AI Producer is now deep-processing your creative matrix for "${result.brief?.business_name || 'Campaign'}".`;
+            }
+
+            await createNotification({
+                userId,
+                type: `AI_PRODUCER_STATUS_${statusToSync.toUpperCase()}`,
+                title,
+                message,
+                link: `https://adplatform.raver.ai/dashboard/projects?campaignId=${result.campaign_id}`,
+                metadata: { campaignId: result.campaign_id, status: statusToSync }
+            });
         }
 
-        try {
-            // 1. Fetch current local state of the production
-            const localResult = await (prisma as any).producerResult.findUnique({ where: { campaignId: result.campaign_id } });
-            const localCampaign = await (prisma as any).campaign.findUnique({ where: { id: result.campaign_id } });
-
-            // 2. Terminal state protection: If local status is already 'approved' or 'rejected',
-            // background sync should NOT "downgrade" the status.
-            const terminalStatuses = ['approved', 'rejected', 'live', 'complete'];
-            const finalized = localResult && terminalStatuses.includes(localResult.status);
-            const statusToSync = finalized ? localResult.status : result.status;
-
-            // 3. Upsert ProducerResult
-            await (prisma as any).producerResult.upsert({
-                where: { campaignId: result.campaign_id },
-                create: {
-                    userId,
-                    campaignId: result.campaign_id,
-                    brief: result.brief,
-                    status: statusToSync,
-                    result: result
-                },
-                update: {
-                    status: statusToSync,
-                    result: result
-                }
-            });
-
-            // 4. Upsert high-level Campaign record
-            await (prisma as any).campaign.upsert({
-                where: { id: result.campaign_id },
-                create: {
-                    id: result.campaign_id,
-                    userId,
-                    name: result.brief?.business_name || 'AI Campaign',
-                    status: statusToSync,
-                    audience: result.brief?.target_audience,
-                    format: result.brief?.format,
-                    platforms: result.brief?.platform ? [result.brief.platform] : [],
-                    tones: result.brief?.tone ? [result.brief.tone] : [],
-                    visualStyles: result.brief?.mood ? [result.brief.mood] : []
-                },
-                update: {
-                    status: statusToSync,
-                    audience: result.brief?.target_audience,
-                    format: result.brief?.format,
-                    platforms: result.brief?.platform ? [result.brief.platform] : [],
-                    tones: result.brief?.tone ? [result.brief.tone] : [],
-                    visualStyles: result.brief?.mood ? [result.brief.mood] : []
-                }
-            });
-        } catch (dbError) {
-            console.error('[AIProducerController] Sync error:', dbError);
-        }
+        // 5. Upsert high-level Campaign record
+        await (prisma as any).campaign.upsert({
+          where: { id: result.campaign_id },
+          create: {
+            id: result.campaign_id,
+            userId,
+            name: result.brief?.business_name || 'AI Campaign',
+            status: statusToSync,
+            audience: result.brief?.target_audience,
+            format: result.brief?.format,
+            platforms: result.brief?.platform ? [result.brief.platform] : [],
+            tones: result.brief?.tone ? [result.brief.tone] : [],
+            visualStyles: result.brief?.mood ? [result.brief.mood] : []
+          },
+          update: {
+            status: statusToSync,
+            audience: result.brief?.target_audience,
+            format: result.brief?.format,
+            platforms: result.brief?.platform ? [result.brief.platform] : [],
+            tones: result.brief?.tone ? [result.brief.tone] : [],
+            visualStyles: result.brief?.mood ? [result.brief.mood] : []
+          }
+        });
+      } catch (dbError) {
+        console.error('[AIProducerController] Sync error:', dbError);
+      }
     }
 
     return res.json({ success: true, data: result });
@@ -194,7 +220,7 @@ export const listCampaigns = async (req: AuthRequest, res: Response): Promise<an
   try {
     const userId = req.user?.id;
     if (!userId) {
-        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
     // Fetch primary tracking records from local DB
@@ -202,7 +228,7 @@ export const listCampaigns = async (req: AuthRequest, res: Response): Promise<an
     // Deletions are respected because we no longer blindly sync from Proxy on every list call.
     const campaigns = await (prisma as any).campaign.findMany({
       where: { userId },
-      include: { 
+      include: {
         metrics: true
       },
       orderBy: { createdAt: 'desc' }
@@ -219,78 +245,78 @@ export const approveCampaign = async (req: AuthRequest, res: Response): Promise<
     const { campaign_id } = req.params;
     const userId = req.user?.id;
     const body = req.body || {}; // Defensive fallback for undefined body
-    
+
     let result;
     try {
       result = await producerService.approveCampaign(campaign_id as string, body);
     } catch (proxyError: any) {
       console.warn(`[AIProducerController] External approval failed for ${campaign_id}, proceeding with local update:`, proxyError.message);
-      
+
       // Fallback: Use body data to update local record if AI backend doesn't have it
       result = {
-          campaign_id: campaign_id,
-          status: body.approved !== false ? 'approved' : 'rejected', // Default to approved unless explicitly false
-          approval: {
-              approved: body.approved !== false,
-              notes: body.notes || '',
-              is_local_fallback: true
-          }
+        campaign_id: campaign_id,
+        status: body.approved !== false ? 'approved' : 'rejected', // Default to approved unless explicitly false
+        approval: {
+          approved: body.approved !== false,
+          notes: body.notes || '',
+          is_local_fallback: true
+        }
       };
     }
 
     if (userId && campaign_id) {
-        const status = result.status || (body.approved !== false ? 'approved' : 'rejected');
-        try {
-            // Update ProducerResult
-            const existingResult = await (prisma as any).producerResult.findUnique({ where: { campaignId: campaign_id } });
-            
-            await (prisma as any).producerResult.upsert({
-                where: { campaignId: campaign_id },
-                create: {
-                    userId,
-                    campaignId: campaign_id,
-                    status: status,
-                    result: result
-                },
-                update: {
-                    status: status,
-                    result: {
-                        ...(existingResult?.result || {}),
-                        approval: {
-                            approved: body.approved !== false,
-                            notes: body.notes || '',
-                            result: result
-                        }
-                    }
-                }
-            });
+      const status = result.status || (body.approved !== false ? 'approved' : 'rejected');
+      try {
+        // Update ProducerResult
+        const existingResult = await (prisma as any).producerResult.findUnique({ where: { campaignId: campaign_id } });
 
-            // Update Campaign
-            await (prisma as any).campaign.upsert({
-                where: { id: campaign_id },
-                create: {
-                    id: campaign_id,
-                    userId,
-                    name: 'AI Campaign',
-                    status: status
-                },
-                update: { status: status }
-            });
+        await (prisma as any).producerResult.upsert({
+          where: { campaignId: campaign_id },
+          create: {
+            userId,
+            campaignId: campaign_id,
+            status: status,
+            result: result
+          },
+          update: {
+            status: status,
+            result: {
+              ...(existingResult?.result || {}),
+              approval: {
+                approved: body.approved !== false,
+                notes: body.notes || '',
+                result: result
+              }
+            }
+          }
+        });
 
-            // Trigger notification
-            await createNotification({
-                userId,
-                type: status === 'approved' ? 'AI_PRODUCER_APPROVED' : 'AI_PRODUCER_REJECTED',
-                title: status === 'approved' ? 'Production Approved' : 'Production Rejected',
-                message: status === 'approved' 
-                    ? `Your campaign production for "${campaign_id}" has been approved.`
-                    : `Your campaign production for "${campaign_id}" has been rejected.`,
-                link: `https://adplatform.raver.ai/dashboard/projects?campaignId=${campaign_id}`,
-                metadata: { campaignId: campaign_id, status }
-            });
-        } catch (dbError) {
-            console.error('[AIProducerController] Approval sync error:', dbError);
-        }
+        // Update Campaign
+        await (prisma as any).campaign.upsert({
+          where: { id: campaign_id },
+          create: {
+            id: campaign_id,
+            userId,
+            name: 'AI Campaign',
+            status: status
+          },
+          update: { status: status }
+        });
+
+        // Trigger notification
+        await createNotification({
+          userId,
+          type: status === 'approved' ? 'AI_PRODUCER_APPROVED' : 'AI_PRODUCER_REJECTED',
+          title: status === 'approved' ? 'Production Approved' : 'Production Rejected',
+          message: status === 'approved'
+            ? `Your campaign production for "${campaign_id}" has been approved.`
+            : `Your campaign production for "${campaign_id}" has been rejected.`,
+          link: `https://adplatform.raver.ai/dashboard/projects?campaignId=${campaign_id}`,
+          metadata: { campaignId: campaign_id, status }
+        });
+      } catch (dbError) {
+        console.error('[AIProducerController] Approval sync error:', dbError);
+      }
     }
 
     return res.json({ success: true, data: result });
@@ -323,7 +349,7 @@ export const deleteCampaign = async (req: AuthRequest, res: Response): Promise<a
     try {
       // 2a. Delete from Agent Result tables (Isolated data)
       const where = { campaignId: campaign_id, userId };
-      
+
       await (prisma as any).producerResult.deleteMany({ where });
       await (prisma as any).imageLeadResult.deleteMany({ where });
       await (prisma as any).audioLeadResult.deleteMany({ where });
