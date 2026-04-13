@@ -336,7 +336,11 @@ export const deleteCampaign = async (req: AuthRequest, res: Response): Promise<a
       // 2c. Delete associated Assets (Optional but recommended for full cleanup)
       await (prisma as any).asset.deleteMany({ where: { campaignId: campaign_id, userId } });
 
-      // 2d. Delete high-level Campaign record
+      // 2d. Delete associated Notifications
+      // We use raw execution because filtering by JSONB metadata->>'campaignId' is most reliable via SQL
+      await (prisma as any).$executeRaw`DELETE FROM "Notification" WHERE "userId" = ${userId}::uuid AND "metadata"->>'campaignId' = ${campaign_id}`;
+
+      // 2e. Delete high-level Campaign record
       await (prisma as any).campaign.delete({
         where: { id: campaign_id }
       });
