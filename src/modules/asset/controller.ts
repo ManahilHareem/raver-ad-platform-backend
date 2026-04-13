@@ -11,7 +11,7 @@ export const getAssets = async (req: Request, res: Response) => {
     }
 
     const assets = await assetService.getAllAssets(userId);
-    const stats = await assetService.getUserStorageStats(userId);
+    const stats = assetService.calculateStatsFromAssets(assets);
     
     // Explicitly tell the browser not to cache this list
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');

@@ -1,6 +1,6 @@
 import prisma from '../../db/prisma';
 import s3Client from '../../config/s3';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export const getAllAssets = async (userId: string) => {
@@ -24,7 +24,10 @@ export const getAllAssets = async (userId: string) => {
         name: `AI Scene - ${i.sessionId}`,
         url: i.mainImageUrl,
         createdAt: i.createdAt,
-        origin: 'AI Image Lead'
+        origin: 'AI Image Lead',
+        fileSize: 524288,
+        rawMetadata: i.metadata,
+        dbId: i.id
       })),
       ...audios.flatMap((a: any) => {
         const variations = [];
@@ -36,7 +39,10 @@ export const getAllAssets = async (userId: string) => {
           name: `AI Mix - ${a.sessionId}`,
           url: a.mixUrl,
           createdAt: a.createdAt,
-          origin: 'AI Audio Lead'
+          origin: 'AI Audio Lead',
+          fileSize: 1572864,
+          rawMetadata: a.metadata,
+          dbId: a.id
         });
         if (a.voiceoverUrl) variations.push({
           id: `${a.id}-voice`,
@@ -46,7 +52,10 @@ export const getAllAssets = async (userId: string) => {
           name: `AI Voiceover - ${a.sessionId}`,
           url: a.voiceoverUrl,
           createdAt: a.createdAt,
-          origin: 'AI Audio Lead'
+          origin: 'AI Audio Lead',
+          fileSize: 1048576,
+          rawMetadata: a.metadata,
+          dbId: a.id
         });
         if (a.musicUrl) variations.push({
           id: `${a.id}-music`,
@@ -56,7 +65,10 @@ export const getAllAssets = async (userId: string) => {
           name: `AI Music - ${a.sessionId}`,
           url: a.musicUrl,
           createdAt: a.createdAt,
-          origin: 'AI Audio Lead'
+          origin: 'AI Audio Lead',
+          fileSize: 1048576,
+          rawMetadata: a.metadata,
+          dbId: a.id
         });
         return variations;
       }),
@@ -68,7 +80,10 @@ export const getAllAssets = async (userId: string) => {
         name: `AI Render - ${e.sessionId}`,
         url: e.videoUrl,
         createdAt: e.createdAt,
-        origin: 'AI Editor'
+        origin: 'AI Editor',
+        fileSize: 10485760,
+        rawMetadata: e.metadata,
+        dbId: e.id
       })),
       ...producers.filter((p: any) => p.result && (p.result.video_url || p.result.videoUrl)).map((p: any) => ({
         id: p.id,
@@ -78,12 +93,26 @@ export const getAllAssets = async (userId: string) => {
         name: `Production Export - ${p.sessionId}`,
         url: p.result.video_url || p.result.videoUrl,
         createdAt: p.createdAt,
-        origin: 'AI Producer'
+        origin: 'AI Producer',
+        fileSize: 15728640,
+        rawMetadata: p.result,
+        dbId: p.id
       }))
     ];
 
-    // 3. Combine and sort
-    const allAssets = [...standardAssets, ...aiAssets].sort((a: any, b: any) => 
+    // 3. Process and normalize with background sync for sizes
+    const normalizedAiAssets = await Promise.all(aiAssets.map(async (asset) => {
+      const actualSize = await syncAssetSize(asset);
+      return { ...asset, fileSize: actualSize };
+    }));
+
+    const normalizedStandardAssets = await Promise.all(standardAssets.map(async (asset) => {
+      const actualSize = await syncAssetSize({ ...asset, origin: 'Asset', rawMetadata: asset, dbId: asset.id });
+      return { ...asset, fileSize: actualSize };
+    }));
+
+    // 4. Combine and sort
+    const allAssets = [...normalizedStandardAssets, ...normalizedAiAssets].sort((a: any, b: any) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
@@ -158,26 +187,28 @@ export const deleteAsset = async (id: string) => {
   }
 };
 
+export const calculateStatsFromAssets = (assets: any[]) => {
+  const totalAssets = assets.length;
+  const storageUsedBytes = assets.reduce((sum: number, asset: any) => sum + (asset.fileSize || 0), 0);
+  const quotaBytes = 1 * 1024 * 1024 * 1024; // 1 GB in bytes
+  const storageAvailableBytes = Math.max(0, quotaBytes - storageUsedBytes);
+
+  return {
+    totalAssets,
+    storageUsedBytes,
+    storageAvailableBytes,
+    quotaBytes,
+    storageUsedMB: (storageUsedBytes / (1024 * 1024)).toFixed(2),
+    storageAvailableMB: (storageAvailableBytes / (1024 * 1024)).toFixed(2),
+  };
+};
+
 export const getUserStorageStats = async (userId: string) => {
   try {
-    const assets = await prisma.asset.findMany({
-      where: { userId },
-      select: { fileSize: true }
-    });
-
-    const totalAssets = assets.length;
-    const storageUsedBytes = assets.reduce((sum: number, asset: any) => sum + (asset.fileSize || 0), 0);
-    const quotaBytes = 1 * 1024 * 1024 * 1024; // 1 GB in bytes
-    const storageAvailableBytes = Math.max(0, quotaBytes - storageUsedBytes);
-
-    return {
-      totalAssets,
-      storageUsedBytes,
-      storageAvailableBytes,
-      quotaBytes,
-      storageUsedMB: (storageUsedBytes / (1024 * 1024)).toFixed(2),
-      storageAvailableMB: (storageAvailableBytes / (1024 * 1024)).toFixed(2),
-    };
+    // This is essentially doing what getAllAssets does but just for stats.
+    // However, to keep it simple and consistent, we'll reuse the logic or call it.
+    const allAssets = await getAllAssets(userId);
+    return calculateStatsFromAssets(allAssets);
   } catch (error) {
     console.error('[AssetService] Error calculating storage stats:', userId, error);
     throw new Error('Could not calculate storage statistics.');
@@ -219,4 +250,75 @@ export const getPresignedUploadUrl = async (fileName: string, contentType: strin
     console.error('[AssetService] Error generating pre-signed URL:', error);
     throw new Error('Could not generate pre-signed URL.');
   }
+};
+export const getS3ObjectSize = async (url: string): Promise<number | null> => {
+  try {
+    const bucketName = process.env.AWS_S3_BUCKET_NAME;
+    if (!bucketName || !url.includes(bucketName)) return null;
+
+    const keyIndex = url.indexOf('assets/');
+    if (keyIndex === -1) return null;
+    const key = url.substring(keyIndex);
+
+    const command = new HeadObjectCommand({
+      Bucket: bucketName,
+      Key: key
+    });
+    const response = await s3Client.send(command);
+    return response.ContentLength || null;
+  } catch (error) {
+    // Silently fail to avoid blocking the main flow
+    return null;
+  }
+};
+
+export const syncAssetSize = async (asset: any) => {
+  if (asset.fileSize && asset.fileSize > 0 && asset.fileSize !== 524288 && asset.fileSize !== 1048576 && asset.fileSize !== 1572864 && asset.fileSize !== 10485760 && asset.fileSize !== 15728640) {
+    return asset.fileSize;
+  }
+
+  // Check metadata for cached size
+  if (asset.metadata && (asset.metadata as any).actualSize) {
+    return (asset.metadata as any).actualSize;
+  }
+
+  const actualSize = await getS3ObjectSize(asset.url);
+  if (actualSize) {
+    // Background update to cache the size
+    const updatePromise = (async () => {
+      try {
+        if (asset.origin === 'Asset') {
+          await prisma.asset.update({
+            where: { id: asset.dbId || asset.id },
+            data: { fileSize: actualSize }
+          });
+        } else if (asset.origin === 'AI Image Lead') {
+          await (prisma as any).imageLeadResult.update({
+            where: { id: asset.dbId || asset.id },
+            data: { metadata: { ...(asset.rawMetadata || {}), actualSize } }
+          });
+        } else if (asset.origin === 'AI Audio Lead') {
+          await (prisma as any).audioLeadResult.update({
+            where: { id: asset.dbId },
+            data: { metadata: { ...(asset.rawMetadata || {}), actualSize } }
+          });
+        } else if (asset.origin === 'AI Editor') {
+          await (prisma as any).editorResult.update({
+            where: { id: asset.dbId || asset.id },
+            data: { metadata: { ...(asset.rawMetadata || {}), actualSize } }
+          });
+        } else if (asset.origin === 'AI Producer') {
+          await (prisma as any).producerResult.update({
+            where: { id: asset.dbId || asset.id },
+            data: { result: { ...(asset.rawMetadata || {}), actualSize } }
+          });
+        }
+      } catch (e) {
+        console.error(`[AssetService] Failed to cache size for ${asset.id}:`, e);
+      }
+    })();
+    return actualSize;
+  }
+
+  return asset.fileSize || 0;
 };

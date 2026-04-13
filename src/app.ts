@@ -24,6 +24,7 @@ import aiInsightsRoutes from './modules/ai-insights';
 import aiQualityRoutes from './modules/ai-quality';
 import voiceRoutes from './modules/voice';
 import notificationRoutes from './modules/notification';
+import analyticsRoutes from './modules/analytics';
 import { authMiddleware } from './middleware/auth';
 
 const app = express();
@@ -70,5 +71,6 @@ app.use('/api/ai/producer', authMiddleware, aiProducerRoutes);
 app.use('/api/ai/director', authMiddleware, aiDirectorRoutes);
 app.use('/api/ai/insights', authMiddleware, aiInsightsRoutes);
 app.use('/api/ai/quality', authMiddleware, aiQualityRoutes);
+app.use('/api/analytics', authMiddleware, analyticsRoutes);
 
 export default app;
