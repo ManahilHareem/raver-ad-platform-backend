@@ -16,19 +16,48 @@ export const getAllAssets = async (userId: string) => {
 
     // 2. Normalize agent results into Asset objects
     const aiAssets: any[] = [
-      ...images.filter((i: any) => i.mainImageUrl).map((i: any) => ({
-        id: i.id,
-        userId: i.userId,
-        campaignId: i.campaignId,
-        type: 'image',
-        name: `AI Scene - ${i.sessionId}`,
-        url: i.mainImageUrl,
-        createdAt: i.createdAt,
-        origin: 'AI Image Lead',
-        fileSize: 524288,
-        rawMetadata: i.metadata,
-        dbId: i.id
-      })),
+      ...images.flatMap((i: any) => {
+        const assetsToReturn: any[] = [];
+        
+        // Push the main image if it exists
+        if (i.mainImageUrl) {
+          assetsToReturn.push({
+            id: `${i.id}-main`,
+            userId: i.userId,
+            campaignId: i.campaignId,
+            type: 'image',
+            name: `AI Main Scene - ${i.sessionId?.substring(0, 8) || 'Concept'}`,
+            url: i.mainImageUrl,
+            createdAt: i.createdAt,
+            origin: 'AI Image Lead',
+            fileSize: 524288,
+            rawMetadata: i.metadata,
+            dbId: i.id
+          });
+        }
+        
+        // Push individually generated scenes if they exist
+        if (i.scenes && Array.isArray(i.scenes)) {
+          i.scenes.forEach((scene: any, idx: number) => {
+            if (scene.url && scene.url !== i.mainImageUrl) {
+              assetsToReturn.push({
+                id: `${i.id}-scene-${idx}`,
+                userId: i.userId,
+                campaignId: i.campaignId,
+                type: 'image',
+                name: scene.label ? `AI Image: ${scene.label}` : `AI Scene ${idx + 1} - ${i.sessionId?.substring(0, 8) || 'Content'}`,
+                url: scene.url,
+                createdAt: i.createdAt,
+                origin: 'AI Image Lead',
+                fileSize: 524288,
+                rawMetadata: i.metadata,
+                dbId: i.id
+              });
+            }
+          });
+        }
+        return assetsToReturn;
+      }),
       ...audios.flatMap((a: any) => {
         const variations = [];
         if (a.mixUrl) variations.push({
@@ -36,7 +65,7 @@ export const getAllAssets = async (userId: string) => {
           userId: a.userId,
           campaignId: a.campaignId,
           type: 'audio',
-          name: `AI Mix - ${a.sessionId}`,
+          name: `AI Mix - ${a.sessionId?.substring(0, 8) || 'Mix'}`,
           url: a.mixUrl,
           createdAt: a.createdAt,
           origin: 'AI Audio Lead',
@@ -49,7 +78,7 @@ export const getAllAssets = async (userId: string) => {
           userId: a.userId,
           campaignId: a.campaignId,
           type: 'audio',
-          name: `AI Voiceover - ${a.sessionId}`,
+          name: `AI Voiceover - ${a.sessionId?.substring(0, 8) || 'Voice'}`,
           url: a.voiceoverUrl,
           createdAt: a.createdAt,
           origin: 'AI Audio Lead',
@@ -62,7 +91,7 @@ export const getAllAssets = async (userId: string) => {
           userId: a.userId,
           campaignId: a.campaignId,
           type: 'audio',
-          name: `AI Music - ${a.sessionId}`,
+          name: `AI Music - ${a.sessionId?.substring(0, 8) || 'Score'}`,
           url: a.musicUrl,
           createdAt: a.createdAt,
           origin: 'AI Audio Lead',
@@ -77,7 +106,7 @@ export const getAllAssets = async (userId: string) => {
         userId: e.userId,
         campaignId: e.campaignId,
         type: 'video',
-        name: `AI Render - ${e.sessionId}`,
+        name: `AI Video Render - ${e.sessionId?.substring(0, 8) || 'Export'}`,
         url: e.videoUrl,
         createdAt: e.createdAt,
         origin: 'AI Editor',
@@ -90,7 +119,7 @@ export const getAllAssets = async (userId: string) => {
         userId: p.userId,
         campaignId: p.campaignId,
         type: 'video',
-        name: `Production Export - ${p.sessionId}`,
+        name: `Production Final - ${p.sessionId?.substring(0, 8) || 'Export'}`,
         url: p.result.video_url || p.result.videoUrl,
         createdAt: p.createdAt,
         origin: 'AI Producer',
@@ -123,6 +152,7 @@ export const getAllAssets = async (userId: string) => {
     throw new Error('Could not fetch combined assets from database.');
   }
 };
+
 
 export const createAsset = async (data: any) => {
   try {
