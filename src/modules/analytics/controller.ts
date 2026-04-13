@@ -142,3 +142,181 @@ export const getPlatformAnalytics = async (req: AuthRequest, res: Response): Pro
     return res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
+
+/**
+ * Deep analytics — aggregates real data across all schema models.
+ * Covers: AI sessions, campaigns, assets, quality audits, and agent outputs.
+ */
+export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    // ── Parallel fetch all tables for this user ──
+    const [
+      campaigns,
+      aiSessions,
+      assets,
+      qualityResults,
+      imageResults,
+      audioResults,
+      copyResults,
+      editorResults,
+      producerResults,
+      metrics
+    ] = await Promise.all([
+      prisma.campaign.findMany({ where: { userId }, include: { metrics: true } }),
+      prisma.aISession.findMany({ where: { userId } }),
+      prisma.asset.findMany({ where: { userId } }),
+      prisma.qualityLeadResult.findMany({ where: { userId } }),
+      prisma.imageLeadResult.findMany({ where: { userId } }),
+      prisma.audioLeadResult.findMany({ where: { userId } }),
+      prisma.copyLeadResult.findMany({ where: { userId } }),
+      prisma.editorResult.findMany({ where: { userId } }),
+      prisma.producerResult.findMany({ where: { userId } }),
+      prisma.metric.findMany({ where: { Campaign: { userId } } })
+    ]);
+
+    // ── 1. Campaign Overview ──
+    const campaignsByStatus: Record<string, number> = {};
+    campaigns.forEach(c => {
+      const s = c.status || 'draft';
+      campaignsByStatus[s] = (campaignsByStatus[s] || 0) + 1;
+    });
+
+    const totalBudget = campaigns.reduce((sum, c) => sum + (c.budget || 0), 0);
+    const totalSpend = metrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
+    const totalImpressions = metrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
+    const totalClicks = metrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
+
+    // ── 2. AI Session Breakdown by Type ──
+    const sessionsByType: Record<string, number> = {};
+    aiSessions.forEach(s => {
+      const t = s.type || 'unknown';
+      sessionsByType[t] = (sessionsByType[t] || 0) + 1;
+    });
+
+    // ── 3. Agent Output Counts ──
+    const agentOutputs = {
+      images: imageResults.length,
+      audio: audioResults.length,
+      copy: copyResults.length,
+      video: editorResults.length,
+      productions: producerResults.length,
+      total: imageResults.length + audioResults.length + copyResults.length + editorResults.length + producerResults.length
+    };
+
+    // ── 4. Quality Audit Summary ──
+    const avgScore = (arr: (number | null | undefined)[]) => {
+      const valid = arr.filter((v): v is number => v != null);
+      return valid.length > 0 ? Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10 : null;
+    };
+
+    const qualitySummary = {
+      totalAudits: qualityResults.length,
+      approved: qualityResults.filter(q => q.decision === 'approved' || q.rejected === false).length,
+      rejected: qualityResults.filter(q => q.decision === 'rejected' || q.rejected === true).length,
+      avgOverallScore: avgScore(qualityResults.map(q => q.overallScore)),
+      avgVisualScore: avgScore(qualityResults.map(q => q.visualScore)),
+      avgBrandAlignmentScore: avgScore(qualityResults.map(q => q.brandAlignmentScore)),
+      avgCopyScore: avgScore(qualityResults.map(q => q.copyScore)),
+      avgPlatformFitScore: avgScore(qualityResults.map(q => q.platformFitScore)),
+      avgAudioFitScore: avgScore(qualityResults.map(q => q.audioFitScore)),
+    };
+
+    // ── 5. Asset Storage Breakdown ──
+    const assetsByType: Record<string, number> = {};
+    let totalStorageBytes = 0;
+    assets.forEach(a => {
+      const t = a.type || 'other';
+      assetsByType[t] = (assetsByType[t] || 0) + 1;
+      totalStorageBytes += (a.fileSize || 0);
+    });
+
+    // ── 6. Content Generation Timeline (last 30 days) ──
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(now.getDate() - 29);
+
+    const allGeneratedItems = [
+      ...imageResults.map(r => ({ type: 'image', createdAt: r.createdAt })),
+      ...audioResults.map(r => ({ type: 'audio', createdAt: r.createdAt })),
+      ...copyResults.map(r => ({ type: 'copy', createdAt: r.createdAt })),
+      ...editorResults.map(r => ({ type: 'video', createdAt: r.createdAt })),
+    ].filter(item => item.createdAt >= thirtyDaysAgo);
+
+    const generationTimeline = Array.from({ length: 30 }, (_, i) => {
+      const date = new Date(thirtyDaysAgo);
+      date.setDate(thirtyDaysAgo.getDate() + i);
+      const dayStr = date.toISOString().split('T')[0];
+      const dayItems = allGeneratedItems.filter(
+        item => item.createdAt.toISOString().split('T')[0] === dayStr
+      );
+      return {
+        date: dayStr,
+        label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        images: dayItems.filter(i => i.type === 'image').length,
+        audio: dayItems.filter(i => i.type === 'audio').length,
+        copy: dayItems.filter(i => i.type === 'copy').length,
+        video: dayItems.filter(i => i.type === 'video').length,
+        total: dayItems.length
+      };
+    });
+
+    // ── 7. Campaign Performance Ranking ──
+    const campaignRanking = campaigns
+      .map(c => {
+        const m = c.metrics || [];
+        const impressions = m.reduce((s, x) => s + x.impressions, 0);
+        const clicks = m.reduce((s, x) => s + x.clicks, 0);
+        const spend = m.reduce((s, x) => s + Number(x.spend), 0);
+        return {
+          id: c.id,
+          name: c.name,
+          status: c.status,
+          budget: c.budget,
+          platforms: c.platforms,
+          impressions,
+          clicks,
+          spend,
+          ctr: impressions > 0 ? Math.round((clicks / impressions) * 10000) / 100 : 0,
+          createdAt: c.createdAt
+        };
+      })
+      .sort((a, b) => b.impressions - a.impressions);
+
+    return res.json({
+      success: true,
+      data: {
+        overview: {
+          totalCampaigns: campaigns.length,
+          totalSessions: aiSessions.length,
+          totalAssets: assets.length,
+          totalAgentOutputs: agentOutputs.total,
+          totalQualityAudits: qualityResults.length,
+          totalBudget,
+          totalSpend,
+          totalImpressions,
+          totalClicks,
+          overallCTR: totalImpressions > 0 ? Math.round((totalClicks / totalImpressions) * 10000) / 100 : 0
+        },
+        campaignsByStatus,
+        sessionsByType,
+        agentOutputs,
+        qualitySummary,
+        assetBreakdown: {
+          byType: assetsByType,
+          total: assets.length,
+          storageMB: Math.round(totalStorageBytes / (1024 * 1024) * 100) / 100
+        },
+        generationTimeline,
+        campaignRanking
+      }
+    });
+  } catch (error: any) {
+    console.error('[AnalyticsController] Error getting deep analytics:', error);
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
