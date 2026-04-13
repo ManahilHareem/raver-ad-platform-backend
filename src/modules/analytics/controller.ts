@@ -164,10 +164,9 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
       audioResults,
       copyResults,
       editorResults,
-      producerResults,
-      metrics
+      producerResults
     ] = await Promise.all([
-      prisma.campaign.findMany({ where: { userId }, include: { metrics: true } }),
+      prisma.campaign.findMany({ where: { userId } }),
       prisma.aISession.findMany({ where: { userId } }),
       prisma.asset.findMany({ where: { userId } }),
       prisma.qualityLeadResult.findMany({ where: { userId } }),
@@ -175,8 +174,7 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
       prisma.audioLeadResult.findMany({ where: { userId } }),
       prisma.copyLeadResult.findMany({ where: { userId } }),
       prisma.editorResult.findMany({ where: { userId } }),
-      prisma.producerResult.findMany({ where: { userId } }),
-      prisma.metric.findMany({ where: { Campaign: { userId } } })
+      prisma.producerResult.findMany({ where: { userId } })
     ]);
 
     // ── 1. Campaign Overview ──
@@ -187,9 +185,6 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
     });
 
     const totalBudget = campaigns.reduce((sum, c) => sum + (c.budget || 0), 0);
-    const totalSpend = metrics.reduce((sum, m) => sum + Number(m.spend || 0), 0);
-    const totalImpressions = metrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
-    const totalClicks = metrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
 
     // ── 2. AI Session Breakdown by Type ──
     const sessionsByType: Record<string, number> = {};
@@ -265,27 +260,17 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
       };
     });
 
-    // ── 7. Campaign Performance Ranking ──
+    // ── 7. Campaign Roster Ranking ──
     const campaignRanking = campaigns
-      .map(c => {
-        const m = c.metrics || [];
-        const impressions = m.reduce((s, x) => s + x.impressions, 0);
-        const clicks = m.reduce((s, x) => s + x.clicks, 0);
-        const spend = m.reduce((s, x) => s + Number(x.spend), 0);
-        return {
-          id: c.id,
-          name: c.name,
-          status: c.status,
-          budget: c.budget,
-          platforms: c.platforms,
-          impressions,
-          clicks,
-          spend,
-          ctr: impressions > 0 ? Math.round((clicks / impressions) * 10000) / 100 : 0,
-          createdAt: c.createdAt
-        };
-      })
-      .sort((a, b) => b.impressions - a.impressions);
+      .map(c => ({
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        budget: c.budget,
+        platforms: c.platforms,
+        createdAt: c.createdAt
+      }))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return res.json({
       success: true,
@@ -296,11 +281,7 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
           totalAssets: assets.length,
           totalAgentOutputs: agentOutputs.total,
           totalQualityAudits: qualityResults.length,
-          totalBudget,
-          totalSpend,
-          totalImpressions,
-          totalClicks,
-          overallCTR: totalImpressions > 0 ? Math.round((totalClicks / totalImpressions) * 10000) / 100 : 0
+          totalBudget
         },
         campaignsByStatus,
         sessionsByType,
