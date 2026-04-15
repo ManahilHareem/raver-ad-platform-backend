@@ -1,4 +1,5 @@
 import prisma from '../../db/prisma';
+import { stripe } from '../../config/stripe';
 
 const isValidUuid = (uuid: string) => {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid);
@@ -85,4 +86,48 @@ export const getPaymentMethods = async (userId: string) => {
     console.error(`Error fetching payment methods for user ID (${userId}):`, error);
     throw new Error('Could not retrieve payment methods');
   }
+};
+
+export const getOrCreateStripeCustomer = async (userId: string, email: string) => {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
+  const billing = await prisma.billing.findUnique({ where: { userId } });
+  
+  if (billing?.stripeCustomerId) {
+    return billing.stripeCustomerId;
+  }
+
+  const customer = await stripe.customers.create({
+    email,
+    metadata: { userId },
+  });
+
+  await prisma.billing.upsert({
+    where: { userId },
+    update: { stripeCustomerId: customer.id },
+    create: { userId, stripeCustomerId: customer.id }
+  });
+
+  return customer.id;
+};
+
+export const updateBillingFromStripe = async (stripeCustomerId: string, data: { planTier: string; status: string; currentPeriodEnd?: Date }) => {
+  const billing = await prisma.billing.findFirst({
+    where: { stripeCustomerId }
+  });
+
+  if (!billing) {
+    console.error(`No billing record found for Stripe Customer ID: ${stripeCustomerId}`);
+    return;
+  }
+
+  return await prisma.billing.update({
+    where: { id: billing.id },
+    data: {
+      planTier: data.planTier,
+      status: data.status,
+      currentPeriodEnd: data.currentPeriodEnd
+    }
+  });
 };

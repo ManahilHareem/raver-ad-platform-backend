@@ -17,19 +17,45 @@ export const launchCampaign = async (req: AuthRequest, res: Response): Promise<a
           create: {
             userId,
             campaignId: result.campaign_id,
-            sessionId: req.body.session_id,
-            brief: req.body.brief,
+            sessionId: req.body.session_id || result.session_id,
+            brief: req.body.brief || result.brief,
             status: result.status || 'queued',
             result: result
           },
           update: {
             status: result.status || 'queued',
-            brief: req.body.brief,
-            result: result
+            brief: req.body.brief || result.brief,
+            result: result,
+            sessionId: req.body.session_id || result.session_id
           }
         });
 
-        // Trigger notification
+        // 2. Also upsert high-level Campaign record for visibility in standard dashboard
+        await (prisma as any).campaign.upsert({
+          where: { id: result.campaign_id },
+          create: {
+            id: result.campaign_id,
+            userId,
+            name: req.body.brief?.business_name || result.brief?.business_name || 'AI Campaign',
+            status: result.status || 'queued',
+            audience: req.body.brief?.target_audience || result.brief?.target_audience,
+            format: req.body.brief?.format || result.brief?.format,
+            platforms: req.body.brief?.platform ? [req.body.brief.platform] : (result.brief?.platform ? [result.brief.platform] : []),
+            tones: req.body.brief?.tone ? [req.body.brief.tone] : (result.brief?.tone ? [result.brief.tone] : []),
+            visualStyles: req.body.brief?.mood ? [req.body.brief.mood] : (result.brief?.mood ? [result.brief.mood] : [])
+          },
+          update: {
+            status: result.status || 'queued',
+            name: req.body.brief?.business_name || result.brief?.business_name || 'AI Campaign',
+            audience: req.body.brief?.target_audience || result.brief?.target_audience,
+            format: req.body.brief?.format || result.brief?.format,
+            platforms: req.body.brief?.platform ? [req.body.brief.platform] : (result.brief?.platform ? [result.brief.platform] : []),
+            tones: req.body.brief?.tone ? [req.body.brief.tone] : (result.brief?.tone ? [result.brief.tone] : []),
+            visualStyles: req.body.brief?.mood ? [req.body.brief.mood] : (result.brief?.mood ? [result.brief.mood] : [])
+          }
+        });
+
+        // 3. Trigger notification
         await createNotification({
           userId,
           type: 'AI_PRODUCER_LAUNCHED',
@@ -64,23 +90,29 @@ export const getCampaign = async (req: AuthRequest, res: Response): Promise<any>
       console.warn(`[AIProducerController] External lookup failed for ${campaign_id}, checking local fallback.`);
 
       // Special Auto-Seeding for specific test campaigns requested by user
-      const testIds = ['29440e40-6401-4b6d-9b42-baf6061950c3', '8b20b09f-cfdd-4568-b46f-8ea4bcc89f7c'];
+      const testIds = ['29440e40-6401-4b6d-9b42-baf6061950c3', '8b20b09f-cfdd-4568-b46f-8ea4bcc89f7c', 'c2965fdd-3031-482e-8e14-7a6132e8237b'];
       if (testIds.includes(campaign_id as string) && userId) {
         let existing = await (prisma as any).producerResult.findUnique({ where: { campaignId: campaign_id } });
         if (!existing) {
-          console.log(`[AIProducerController] Auto-seeding approved production for campaign ${campaign_id}`);
+          const isAura = campaign_id === 'c2965fdd-3031-482e-8e14-7a6132e8237b';
+          const seedStatus = isAura ? 'queued' : 'approved';
+          const seedName = isAura ? 'aura ' : (testIds.indexOf(campaign_id as string) === 0 ? 'Seeded Approved Production' : 'Studio Test Production');
+          
+          console.log(`[AIProducerController] Auto-seeding ${seedStatus} production for campaign ${campaign_id}`);
+          
           await (prisma as any).campaign.upsert({
             where: { id: campaign_id },
-            update: { status: 'approved' },
+            update: { status: seedStatus },
             create: {
               id: campaign_id,
               userId,
-              name: testIds.indexOf(campaign_id as string) === 0 ? 'Seeded Approved Production' : 'Studio Test Production',
-              status: 'approved',
+              name: seedName,
+              status: seedStatus,
               budget: 1500,
               platforms: ['Instagram', 'TikTok'],
-              tones: ['Modern'],
-              visualStyles: ['Cinematic']
+              tones: ['Luxury'],
+              visualStyles: ['Cinematic'],
+              audience: isAura ? 'genz ' : 'General'
             }
           });
 
@@ -88,9 +120,25 @@ export const getCampaign = async (req: AuthRequest, res: Response): Promise<any>
             data: {
               userId,
               campaignId: campaign_id,
-              status: 'approved',
-              brief: { business_name: 'Raver AI Sample', product_description: 'An approved production' },
-              result: {
+              status: seedStatus,
+              brief: { 
+                business_name: seedName, 
+                target_audience: isAura ? 'genz ' : 'General',
+                product_description: isAura ? 'Aura Cinematic Campaign' : 'An approved production' 
+              },
+              result: isAura ? {
+                campaign_id: campaign_id,
+                status: 'queued',
+                session_id: 'raver_prod_1776262508492',
+                nodes: {
+                  generate_image: { status: 'pending' },
+                  generate_text: { status: 'pending' },
+                  generate_voice: { status: 'pending' },
+                  generate_music: { status: 'pending' },
+                  render: { status: 'pending' },
+                  score_quality: { status: 'pending' }
+                }
+              } : {
                 video_url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
                 status: 'completed',
                 campaign_id: campaign_id

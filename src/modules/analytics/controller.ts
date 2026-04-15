@@ -308,6 +308,12 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
         
         const revenueValue = c.budget && c.budget > 0 ? (c.budget * 0.8) : (spend > 0 ? spend * 1.5 : 0);
 
+        // Link AISession if exists for this campaign
+        const matchingSession = aiSessions.find(s => 
+          s.campaignId === c.id || 
+          (s.metadata && (s.metadata as any).campaign_id === c.id)
+        );
+
         return {
           id: c.id,
           name: c.name,
@@ -319,7 +325,13 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
           views: views > 0 ? views.toLocaleString() : "0",
           engagement: engagement,
           conversions: views > 0 ? Math.floor(clicks * 0.1).toString() : "0",
-          revenue: revenueValue > 0 ? `$${revenueValue.toLocaleString()}` : "$0"
+          revenue: revenueValue > 0 ? `$${revenueValue.toLocaleString()}` : "$0",
+          aiSession: matchingSession ? {
+            id: matchingSession.id,
+            sessionId: matchingSession.sessionId,
+            type: matchingSession.type,
+            status: (matchingSession.metadata as any)?.status || (matchingSession.metadata as any)?.production?.status
+          } : null
         };
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

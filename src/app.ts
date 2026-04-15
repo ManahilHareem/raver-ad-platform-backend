@@ -30,7 +30,13 @@ import { authMiddleware } from './middleware/auth';
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, res, buf) => {
+    if (req.originalUrl && req.originalUrl.includes('/api/billing/stripe/webhook')) {
+      req.rawBody = buf;
+    }
+  }
+}));
 
 // Main health check
 app.get('/health', (req, res) => {

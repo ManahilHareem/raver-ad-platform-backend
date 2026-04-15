@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import * as billingController from './controller'; // Resync TS server
+import * as billingController from './controller';
+import * as stripeController from './stripeController';
 
 const router = Router();
 
@@ -90,5 +91,41 @@ router.put('/payment-methods/:id', billingController.updatePaymentMethod);
  *         description: List of payment methods
  */
 router.get('/payment-methods', billingController.getPaymentMethods);
+
+/**
+ * @swagger
+ * /api/billing/stripe/create-checkout-session:
+ *   post:
+ *     summary: Create a Stripe checkout session
+ *     tags: [Billing]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               planTier:
+ *                 type: string
+ *                 enum: [pro, enterprise]
+ *     responses:
+ *       200:
+ *         description: Checkout session URL
+ */
+router.post('/stripe/create-checkout-session', stripeController.createCheckoutSession);
+
+/**
+ * @swagger
+ * /api/billing/stripe/webhook:
+ *   post:
+ *     summary: Stripe webhook receiver
+ *     tags: [Billing]
+ *     responses:
+ *       200:
+ *         description: Webhook received
+ */
+router.post('/stripe/webhook', stripeController.handleWebhook);
 
 export default router;
