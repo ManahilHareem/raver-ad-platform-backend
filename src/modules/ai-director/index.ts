@@ -124,6 +124,26 @@ router.get('/session/:session_id/update', controller.getUpdate);
 
 /**
  * @swagger
+ * /api/ai/director/session/{session_id}/db-update:
+ *   get:
+ *     summary: Get session status directly from local database
+ *     tags: [AI Director]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: session_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Local session data
+ */
+router.get('/session/:session_id/db-update', controller.getDbUpdate);
+
+/**
+ * @swagger
  * /api/ai/director/session/{session_id}/approve:
  *   patch:
  *     summary: Approve an AI Director session result locally
@@ -161,5 +181,38 @@ router.patch('/session/:session_id/approve', controller.approveSession);
  *         description: Session deleted successfully
  */
 router.delete('/session/:session_id', controller.deleteSession);
+
+/**
+ * @swagger
+ * /api/ai/director/session/{session_id}/approve-step:
+ *   post:
+ *     summary: Approve or provide feedback on a specific production step
+ *     tags: [AI Director]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: session_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               step_name:
+ *                 type: string
+ *               action:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Step approval processed
+ */
+router.post('/session/:session_id/approve-step', controller.approveStep);
 
 export default router;

@@ -65,10 +65,10 @@ export const chat = async (req: AuthRequest, res: Response): Promise<any> => {
     }
 
     // 2. Append User Message
-    const userMessage = { 
-      role: 'user', 
+    const userMessage = {
+      role: 'user',
       content: message || req.body.content,
-      assets: assets || [] 
+      assets: assets || []
     };
     const updatedHistory = [...existingHistory, userMessage];
 
@@ -92,7 +92,7 @@ export const chat = async (req: AuthRequest, res: Response): Promise<any> => {
 
     if (finalId) {
       const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
-      
+
       // Explicitly track the assets in metadata if provided
       if (assets) {
         merged.assets = assets;
@@ -139,7 +139,7 @@ export const approveSession = async (req: AuthRequest, res: Response): Promise<a
           return res.status(403).json({ success: false, message: 'Unauthorized' });
         }
 
-        const merged = mergeMetadata(session.metadata, { 
+        const merged = mergeMetadata(session.metadata, {
           status: 'approved',
           production: { status: 'approved' }
         });
@@ -165,13 +165,13 @@ export const approveSession = async (req: AuthRequest, res: Response): Promise<a
 
         // Trigger notification
         await createNotification({
-            userId,
-            type: 'AI_DIRECTOR_APPROVED',
-            title: 'Director Session Approved',
-            message: `Your AI Director session ${session_id} has been approved and campaign status updated.`,
-            metadata: { sessionId: session_id }
+          userId,
+          type: 'AI_DIRECTOR_APPROVED',
+          title: 'Director Session Approved',
+          message: `Your AI Director session ${session_id} has been approved and campaign status updated.`,
+          metadata: { sessionId: session_id }
         });
-        
+
         result = updatedSession;
       }
     }
@@ -241,10 +241,10 @@ export const getSession = async (req: AuthRequest, res: Response): Promise<any> 
       }
 
       const merged = mergeMetadata(local?.metadata, result);
-      
+
       // Ensure the metadata reflects our versioned ID, not the base ID from the service
       merged.session_id = session_id;
-      
+
       // If the proxy doesn't report ready, we assume it's still in production
       if (result.status !== 'ready_for_human_review') {
         merged.production = merged.production || {};
@@ -290,17 +290,17 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
 
       const metadata = (local.metadata as any) || {};
       const status = metadata.status || metadata.production?.status || (metadata.campaign_status);
-      
+
       // If already approved or ready, return local state without redundant proxy hit
       if (status === 'approved' || status === 'ready_for_human_review') {
-        return res.json({ 
-          success: true, 
-          data: { 
-            ...metadata, 
-            session_id: local.sessionId, 
+        return res.json({
+          success: true,
+          data: {
+            ...metadata,
+            session_id: local.sessionId,
             campaign_id: local.campaignId,
-            status: status 
-          } 
+            status: status
+          }
         });
       }
     }
@@ -327,7 +327,7 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
 
       const existing = local || await (prisma as any).aISession.findUnique({ where: { sessionId: session_id as string } });
       const merged = mergeMetadata(existing?.metadata, result);
-      
+
       merged.session_id = session_id;
 
       if (result.status !== 'ready_for_human_review') {
@@ -366,6 +366,44 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
     return res.json({ success: true, data: result });
   } catch (error: any) {
     return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+export const getDbUpdate = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { session_id } = req.params;
+    const userId = req.user?.id;
+
+    if (!session_id) {
+      return res.status(400).json({ success: false, message: 'Session ID is required' });
+    }
+
+    const local = await (prisma as any).aISession.findUnique({ where: { sessionId: session_id as string } });
+    
+    if (!local) {
+      return res.status(404).json({ success: false, message: 'Session not found in local database' });
+    }
+
+    if (userId && local.userId !== userId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized access to this session' });
+    }
+
+    const metadata = (local.metadata as any) || {};
+    const status = metadata.status || metadata.production?.status || (metadata.campaign_status);
+
+    return res.json({
+      success: true,
+      data: {
+        ...metadata,
+        session_id: local.sessionId,
+        campaign_id: local.campaignId,
+        status: status,
+        is_local: true
+      }
+    });
+  } catch (error: any) {
+    console.error('[AIDirectorController] DB Update Error:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -455,7 +493,7 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
   try {
     const userId = req.user?.id;
     const { session_id, message } = req.body;
-    const lookupId = session_id ;
+    const lookupId = session_id;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -527,6 +565,60 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     return res.json({ success: true, data: { ...result, history: finalHistory } });
   } catch (error: any) {
     console.error('[AIDirectorController] Chat Error:', error);
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+export const approveStep = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { session_id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const params = {
+      step_name: req.body.step_name || req.query.step_name,
+      action: req.body.action || req.query.action,
+      notes: req.body.notes || req.query.notes,
+      selected_asset_id: req.body.selected_asset_id // Support asset selection if provided
+    };
+
+    const result = await directorService.approveStep(session_id as string, params);
+
+    // 1. Persist the updated state to DB
+    if (session_id && result && result.campaign) {
+      const campaignData = result.campaign;
+      
+      const existing = await (prisma as any).aISession.findUnique({
+        where: { sessionId: session_id as string }
+      });
+
+      const merged = mergeMetadata(existing?.metadata, campaignData);
+      
+      // Ensure we keep track of the specific step approvals in the metadata
+      merged.step_approvals = campaignData.step_approvals || merged.step_approvals || {};
+
+      await (prisma as any).aISession.upsert({
+        where: { sessionId: session_id as string },
+        update: { 
+          metadata: merged, 
+          userId, 
+          campaignId: campaignData.campaign_id || existing?.campaignId 
+        },
+        create: {
+          userId,
+          sessionId: session_id as string,
+          type: 'director',
+          metadata: merged,
+          campaignId: campaignData.campaign_id
+        }
+      });
+    }
+
+    return res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[AIDirectorController] Approve Step Error:', error);
     return res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
