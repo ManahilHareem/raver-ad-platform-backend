@@ -89,64 +89,6 @@ export const getCampaign = async (req: AuthRequest, res: Response): Promise<any>
     } catch (proxyError: any) {
       console.warn(`[AIProducerController] External lookup failed for ${campaign_id}, checking local fallback.`);
 
-      // Special Auto-Seeding for specific test campaigns requested by user
-      const testIds = ['29440e40-6401-4b6d-9b42-baf6061950c3', '8b20b09f-cfdd-4568-b46f-8ea4bcc89f7c', 'c2965fdd-3031-482e-8e14-7a6132e8237b'];
-      if (testIds.includes(campaign_id as string) && userId) {
-        let existing = await (prisma as any).producerResult.findUnique({ where: { campaignId: campaign_id } });
-        if (!existing) {
-          const isAura = campaign_id === 'c2965fdd-3031-482e-8e14-7a6132e8237b';
-          const seedStatus = isAura ? 'queued' : 'approved';
-          const seedName = isAura ? 'aura ' : (testIds.indexOf(campaign_id as string) === 0 ? 'Seeded Approved Production' : 'Studio Test Production');
-          
-          console.log(`[AIProducerController] Auto-seeding ${seedStatus} production for campaign ${campaign_id}`);
-          
-          await (prisma as any).campaign.upsert({
-            where: { id: campaign_id },
-            update: { status: seedStatus },
-            create: {
-              id: campaign_id,
-              userId,
-              name: seedName,
-              status: seedStatus,
-              budget: 1500,
-              platforms: ['Instagram', 'TikTok'],
-              tones: ['Luxury'],
-              visualStyles: ['Cinematic'],
-              audience: isAura ? 'genz ' : 'General'
-            }
-          });
-
-          existing = await (prisma as any).producerResult.create({
-            data: {
-              userId,
-              campaignId: campaign_id,
-              status: seedStatus,
-              brief: { 
-                business_name: seedName, 
-                target_audience: isAura ? 'genz ' : 'General',
-                product_description: isAura ? 'Aura Cinematic Campaign' : 'An approved production' 
-              },
-              result: isAura ? {
-                campaign_id: campaign_id,
-                status: 'queued',
-                session_id: 'raver_prod_1776262508492',
-                nodes: {
-                  generate_image: { status: 'pending' },
-                  generate_text: { status: 'pending' },
-                  generate_voice: { status: 'pending' },
-                  generate_music: { status: 'pending' },
-                  render: { status: 'pending' },
-                  score_quality: { status: 'pending' }
-                }
-              } : {
-                video_url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-                status: 'completed',
-                campaign_id: campaign_id
-              }
-            }
-          });
-        }
-      }
 
       // Fallback: check if we have a local record for this campaign
       const localRecord = await (prisma as any).producerResult.findUnique({
