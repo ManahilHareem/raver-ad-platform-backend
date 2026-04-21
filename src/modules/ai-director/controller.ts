@@ -540,43 +540,18 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
 
     // 5. Save as a NEW session in DB, branching off the previous one
     if (existingSession) {
-      const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
+      // Treat the new result as the single entity source of truth, avoiding deep-merge of old production state
+      const newState = {
+        ...existingMetadata,
+        ...result,
+        history: finalHistory
+      };
 
       // Force status to 'in_production' since we just triggered a regeneration
-      merged.production = merged.production || {};
-      merged.production.status = 'in_production';
-      merged.campaign_status = 'in_production';
-      merged.status = 'in_production';
-
-      // Clear previously generated assets so they don't bleed into the new session
-      merged.video_url = null;
-      merged.music_url = null;
-      merged.voiceover_url = null;
-      merged.image_urls = [];
-      merged.s3_assets = null;
-      merged.result = null;
-      
-      merged.production.video_url = null;
-      merged.production.music_url = null;
-      merged.production.voiceover_url = null;
-      merged.production.image_urls = [];
-      merged.production.scene_videos = [];
-      
-      // Clear step approvals for the new fork
-      merged.step_approvals = {};
-
-      // Clear nodes' results so frontend knows they are recalculating
-      if (merged.nodes) {
-          for (const key of Object.keys(merged.nodes)) {
-              if (merged.nodes[key]) {
-                  merged.nodes[key].status = 'pending';
-                  // Keep the node structure but clear the result
-                  if (merged.nodes[key].result) {
-                      merged.nodes[key].result = null;
-                  }
-              }
-          }
-      }
+      newState.production = newState.production || {};
+      newState.production.status = 'in_production';
+      newState.campaign_status = 'in_production';
+      newState.status = 'in_production';
 
       // Ensure a unique session ID for the new fork
       let newSessionId = result.session_id;
@@ -586,7 +561,7 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
           : existingSession.sessionId;
         newSessionId = `${baseSessionId}_${Date.now()}`;
       }
-      merged.session_id = newSessionId;
+      newState.session_id = newSessionId;
 
       await (prisma as any).aISession.create({
         data: {
@@ -594,11 +569,11 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
           sessionId: newSessionId,
           type: 'director',
           campaignId: existingSession.campaignId,
-          metadata: merged
+          metadata: newState
         }
       });
 
-      return res.json({ success: true, data: merged });
+      return res.json({ success: true, data: newState });
     }
 
     return res.json({ success: true, data: { ...result, history: finalHistory } });
