@@ -486,48 +486,48 @@ export const deleteSession = async (req: AuthRequest, res: Response): Promise<an
 export const regenerateChat = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const userId = req.user?.id;
-    const { session_id, message } = req.body;
-    const lookupId = session_id;
+    const { session_id, campaign_id, message } = req.body;
+    const campaignIdToLookup = campaign_id || session_id;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
+    if (!campaignIdToLookup) {
+      return res.status(400).json({ success: false, message: 'campaign_id or session_id is required' });
+    }
+
     // 1. Load the existing session from DB using campaignId
+    //    The request sends campaign_id which we use to find the AISession
     let existingHistory: any[] = [];
     let existingMetadata: any = {};
     let existingSession: any = null;
-    if (lookupId) {
-      existingSession = await (prisma as any).aISession.findFirst({
-        where: { campaignId: lookupId, type: 'director', userId },
-        orderBy: { createdAt: 'desc' }
-      });
 
-      if (existingSession) {
-        existingMetadata = existingSession.metadata || {};
-        existingHistory = Array.isArray(existingMetadata.history) ? existingMetadata.history : [];
-      }
+    existingSession = await (prisma as any).aISession.findFirst({
+      where: { campaignId: campaignIdToLookup, type: 'director', userId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!existingSession) {
+      return res.status(404).json({
+        success: false,
+        message: `Campaign ${campaignIdToLookup} not found or not authorized`
+      });
     }
+
+    existingMetadata = existingSession.metadata || {};
+    existingHistory = Array.isArray(existingMetadata.history) ? existingMetadata.history : [];
 
     // 2. Append User Message
     const userMessage = { role: 'user', content: message || req.body.content };
     const updatedHistory = [...existingHistory, userMessage];
 
-    // 3. Generate a new session ID for the fork before requesting the AI Proxy
-    let newSessionId = existingSession?.sessionId || session_id;
-    if (existingSession && existingSession.sessionId) {
-      const baseSessionId = existingSession.sessionId.includes('_') 
-        ? existingSession.sessionId.split('_')[0] 
-        : existingSession.sessionId;
-      newSessionId = `${baseSessionId}_${Date.now()}`;
-    }
-
-    // 4. Request AI response
+    // 3. Request AI response with complete campaign context
     const aiRequestPayload = {
-      ...existingMetadata,
+      ...existingMetadata,  // Include all campaign data (brief, nodes, result, etc.)
       message,
-      session_id: newSessionId,
-      campaign_id: existingSession?.campaignId,
+      session_id: existingSession.sessionId,
+      campaign_id: campaignIdToLookup,
       history: updatedHistory
     };
     const result = await directorService.regenerateChat(aiRequestPayload);
@@ -540,72 +540,83 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
       result.voice = detectedVoice;
     }
 
-    // 5. Append Assistant Message
+    // 4. Append Assistant Message
     const assistantMessage = {
       role: 'assistant',
       content: result.message || result.content || (typeof result === 'string' ? result : JSON.stringify(result))
     };
     const finalHistory = [...updatedHistory, assistantMessage];
 
-    // 6. Save as a NEW session in DB, branching off the previous one
-    if (existingSession) {
-      // Treat the new result as the single entity source of truth, avoiding deep-merge of old production state
-      const newState = {
-        ...existingMetadata,
-        ...result,
-        history: finalHistory
-      };
+    // 5. Create NEW session for the regenerated campaign
+    const newCampaignId = result.campaign_id;
+    const newSessionId = result.session_id || `${existingSession.sessionId}_${Date.now()}`;
 
-      // Force status to 'in_production' since we just triggered a regeneration
-      newState.production = newState.production || {};
-      newState.production.status = 'in_production';
-      newState.campaign_status = 'in_production';
-      newState.status = 'in_production';
-      newState.session_id = newSessionId;
-      
-      // Explicitly clear old assets that might have been copied from existingMetadata
-      newState.video_url = null;
-      newState.music_url = null;
-      newState.voiceover_url = null;
-      newState.image_urls = [];
-      newState.s3_assets = null;
-      newState.result = null;
+    const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
 
-      newState.production.video_url = null;
-      newState.production.music_url = null;
-      newState.production.voiceover_url = null;
-      newState.production.image_urls = [];
-      newState.production.scene_videos = [];
-      newState.production.completed_nodes = [];
-      newState.completed_nodes = [];
+    // Force status to 'in_production' since we just triggered a regeneration
+    merged.production = merged.production || {};
+    merged.production.status = 'in_production';
+    merged.campaign_status = 'in_production';
+    merged.status = 'in_production';
+    merged.campaign_id = newCampaignId;
+    merged.session_id = newSessionId;
+    
+    // Explicitly clear old assets from merged so they don't persist in the new session
+    merged.video_url = null;
+    merged.music_url = null;
+    merged.voiceover_url = null;
+    merged.image_urls = [];
+    merged.s3_assets = null;
+    merged.result = null;
 
-      newState.step_approvals = {};
+    merged.production.video_url = null;
+    merged.production.music_url = null;
+    merged.production.voiceover_url = null;
+    merged.production.image_urls = [];
+    merged.production.scene_videos = [];
+    merged.production.completed_nodes = [];
+    merged.completed_nodes = [];
 
-      if (newState.nodes) {
-        for (const key of Object.keys(newState.nodes)) {
-          if (newState.nodes[key]) {
-            newState.nodes[key].status = 'pending';
-            if (newState.nodes[key].result) {
-              newState.nodes[key].result = null;
-            }
+    merged.step_approvals = {};
+
+    if (merged.nodes) {
+      for (const key of Object.keys(merged.nodes)) {
+        if (merged.nodes[key]) {
+          merged.nodes[key].status = 'pending';
+          if (merged.nodes[key].result) {
+            merged.nodes[key].result = null;
           }
         }
       }
-
-      await (prisma as any).aISession.create({
-        data: {
-          userId,
-          sessionId: newSessionId,
-          type: 'director',
-          campaignId: existingSession.campaignId,
-          metadata: newState
-        }
-      });
-
-      return res.json({ success: true, data: newState });
     }
 
-    return res.json({ success: true, data: { ...result, history: finalHistory } });
+    // Create new AISession entry for the regenerated campaign
+    await (prisma as any).aISession.upsert({
+      where: { sessionId: newSessionId },
+      update: {
+        metadata: merged,
+        campaignId: newCampaignId
+      },
+      create: {
+        userId,
+        sessionId: newSessionId,
+        type: 'director',
+        metadata: merged,
+        campaignId: newCampaignId
+      }
+    });
+
+    console.log(`[AIDirectorController] Created new session ${newSessionId} for regenerated campaign ${newCampaignId}`);
+
+    return res.json({
+      success: true,
+      data: {
+        ...merged,
+        new_campaign_id: newCampaignId,
+        new_session_id: newSessionId,
+        original_campaign_id: campaignIdToLookup
+      }
+    });
   } catch (error: any) {
     console.error('[AIDirectorController] Chat Error:', error);
     return res.status(error.status || 500).json({ success: false, message: error.message });

@@ -1,16 +1,18 @@
 import prisma from '../src/db/prisma';
 
 async function main() {
-  const sessionId = "1776719082123";
-  
-  const session = await (prisma as any).aISession.findUnique({
-    where: { sessionId }
+  // Find the most recently created AI Session
+  const session = await (prisma as any).aISession.findFirst({
+    where: { type: 'director' },
+    orderBy: { createdAt: 'desc' }
   });
 
   if (!session) {
-    console.error(`Session ${sessionId} not found`);
+    console.error(`No sessions found in the database.`);
     return;
   }
+
+  const sessionId = session.sessionId;
 
   const metadata = session.metadata as any;
   metadata.status = 'ready_for_human_review';
@@ -38,7 +40,7 @@ async function main() {
      });
   }
 
-  console.log(`Successfully updated ${sessionId} to ready_for_human_review`);
+  console.log(`Successfully updated latest session ${sessionId} to ready_for_human_review`);
 }
 
 main()
