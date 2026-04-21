@@ -311,10 +311,9 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
     }
 
     // 2. Fetch latest state from AI Proxy
-    const cleanId = (session_id as string).includes('_') ? (session_id as string).split('_')[0] : session_id;
     let result: any;
     try {
-      result = await directorService.getUpdate(cleanId as string);
+      result = await directorService.getUpdate(session_id as string);
     } catch (proxyError: any) {
       console.warn(`[AIDirector] Proxy call failed for ${session_id}, returning local data.`);
       if (local) return res.json({ success: true, data: local.metadata });
@@ -522,11 +521,17 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     const userMessage = { role: 'user', content: message || req.body.content };
     const updatedHistory = [...existingHistory, userMessage];
 
+    // Ensure we don't stack underscores. We generate the NEW session ID here.
+    const baseSessionId = existingSession.sessionId.includes('_') 
+      ? existingSession.sessionId.split('_')[0] 
+      : existingSession.sessionId;
+    const cleanSessionIdForProxy = `${baseSessionId}_${Date.now()}`;
+
     // 3. Request AI response with complete campaign context
     const aiRequestPayload = {
       ...existingMetadata,  // Include all campaign data (brief, nodes, result, etc.)
       message,
-      session_id: existingSession.sessionId,
+      session_id: cleanSessionIdForProxy, // Give the proxy the new clean ID
       campaign_id: campaignIdToLookup,
       history: updatedHistory
     };
@@ -547,9 +552,16 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     };
     const finalHistory = [...updatedHistory, assistantMessage];
 
-    // 5. Create NEW session for the regenerated campaign
+    // 5. Use the session ID we sent to the proxy (or what the proxy returns)
+    let newSessionId = result.session_id || cleanSessionIdForProxy;
+    
+    // Safety check: if the proxy somehow returns a stacked ID, fix it
+    if (newSessionId.split('_').length > 2) {
+      const parts = newSessionId.split('_');
+      newSessionId = `${parts[0]}_${parts[parts.length - 1]}`;
+    }
+
     const newCampaignId = result.campaign_id;
-    const newSessionId = result.session_id || `${existingSession.sessionId}_${Date.now()}`;
 
     const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
 
