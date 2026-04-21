@@ -139,13 +139,13 @@ export const mixAudio = async (req: AuthRequest, res: Response): Promise<any> =>
     const { session_id } = req.body;
     const result = await audioService.mixAudio(req.body);
 
-    if (userId && session_id && result.mix_url) {
+    if (userId && session_id && result.mixed_url) {
       await (prisma as any).audioLeadResult.upsert({
         where: { sessionId: session_id },
         update: { 
           campaignId: session_id,
           businessName: req.body.brief?.business_name,
-          mixUrl: result.mix_url,
+          mixUrl: result.mixed_url,
           metadata: { ...result, brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         },
         create: {
@@ -153,7 +153,7 @@ export const mixAudio = async (req: AuthRequest, res: Response): Promise<any> =>
           sessionId: session_id,
           campaignId: session_id,
           businessName: req.body.brief?.business_name,
-          mixUrl: result.mix_url,
+          mixUrl: result.mixed_url,
           metadata: { ...result, brief: req.body.brief, lastUpdatedAt: new Date().toISOString() }
         }
       });
@@ -272,4 +272,3 @@ export const deleteResult = async (req: AuthRequest, res: Response): Promise<any
     return res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
-
