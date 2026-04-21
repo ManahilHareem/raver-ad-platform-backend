@@ -73,6 +73,39 @@ router.get('/campaign/:campaign_id', controller.getCampaign);
 
 /**
  * @swagger
+ * /api/ai/producer/campaign/{session_id}/approve-step:
+ *   post:
+ *     summary: Approve or provide feedback on a specific production step
+ *     tags: [AI Producer]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: session_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               step_name:
+ *                 type: string
+ *               action:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Step approval processed
+ */
+router.post('/campaign/:session_id/approve-step', controller.approveStep);
+
+/**
+ * @swagger
  * /api/ai/producer/campaign/{campaign_id}/approve:
  *   post:
  *     summary: Human Creative Director approval or feedback step

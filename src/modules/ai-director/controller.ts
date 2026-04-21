@@ -150,7 +150,7 @@ export const approveSession = async (req: AuthRequest, res: Response): Promise<a
           data: { metadata: merged }
         });
 
-        // Update linked Campaign if exists
+        // Update linked Campaign and ProducerResult if they exist
         const campaignId = session.campaignId || (session.metadata as any)?.campaign_id;
         if (campaignId) {
           try {
@@ -158,8 +158,13 @@ export const approveSession = async (req: AuthRequest, res: Response): Promise<a
               where: { id: campaignId },
               data: { status: 'approved' }
             });
+            
+            await (prisma as any).producerResult.updateMany({
+              where: { campaignId: campaignId },
+              data: { status: 'approved' }
+            });
           } catch (dbError) {
-            console.error('[AIDirectorController] Campaign status update failed:', dbError);
+            console.error('[AIDirectorController] Sync status update failed:', dbError);
           }
         }
 
@@ -167,9 +172,9 @@ export const approveSession = async (req: AuthRequest, res: Response): Promise<a
         await createNotification({
           userId,
           type: 'AI_DIRECTOR_APPROVED',
-          title: 'Director Session Approved',
-          message: `Your AI Director session ${session_id} has been approved and campaign status updated.`,
-          metadata: { sessionId: session_id }
+          title: 'Production Approved',
+          message: `Your production session ${session_id} has been approved and status updated.`,
+          metadata: { sessionId: session_id, campaignId }
         });
 
         result = updatedSession;
@@ -182,7 +187,6 @@ export const approveSession = async (req: AuthRequest, res: Response): Promise<a
     return res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
-
 
 export const getSession = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
@@ -251,7 +255,8 @@ export const getSession = async (req: AuthRequest, res: Response): Promise<any> 
         merged.production.status = 'in_production';
       }
 
-      const campaignIdToSave = result.campaign_id || (typeof session_id === 'string' && !session_id.includes('_') ? session_id : (local?.campaignId || null));
+      const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const campaignIdToSave = result.campaign_id || (typeof session_id === 'string' && isUuid(session_id) ? session_id : (local?.campaignId || null));
 
       await (prisma as any).aISession.upsert({
         where: { sessionId: session_id as string },
@@ -335,7 +340,8 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
         merged.production.status = 'in_production';
       }
 
-      const campaignIdToSave = result.campaign_id || (typeof session_id === 'string' && !session_id.includes('_') ? session_id : (existing?.campaignId || null));
+      const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const campaignIdToSave = result.campaign_id || (typeof session_id === 'string' && isUuid(session_id) ? session_id : (existing?.campaignId || null));
 
       // Detect shift to ready_for_human_review and notify
       const oldStatus = existing?.metadata ? (existing.metadata as any).status || (existing.metadata as any).production?.status : null;
@@ -422,19 +428,7 @@ export const listSessions = async (req: AuthRequest, res: Response): Promise<any
       orderBy: { createdAt: 'desc' }
     });
 
-    // Deduplicate by campaignId (checking column, metadata, or sessionId prefix)
-    // Only shows the latest session for each unique campaign/conversation
-    const deduplicated = sessions.reduce((acc: any, current: any) => {
-      const metadata = (current.metadata as any) || {};
-      const groupKey = current.campaignId || metadata.campaign_id || current.sessionId.split('_')[0];
-
-      if (!acc[groupKey] || new Date(current.createdAt) > new Date(acc[groupKey].createdAt)) {
-        acc[groupKey] = current;
-      }
-      return acc;
-    }, {});
-
-    const formatted = Object.values(deduplicated).map((s: any) => {
+    const formatted = sessions.map((s: any) => {
       const metadata = (s.metadata as any) || {};
       const history = metadata.history || [];
       const prompt = history.find((m: any) => m.role === 'user')?.content || '';
@@ -506,7 +500,7 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     let existingSession: any = null;
     if (lookupId) {
       existingSession = await (prisma as any).aISession.findFirst({
-        where: { campaignId: lookupId, type: 'director' },
+        where: { campaignId: lookupId, type: 'director', userId },
         orderBy: { createdAt: 'desc' }
       });
 
@@ -614,6 +608,27 @@ export const approveStep = async (req: AuthRequest, res: Response): Promise<any>
           campaignId: campaignData.campaign_id
         }
       });
+
+      // Sync status to Campaign and ProducerResult tables if linked
+      const campaignId = campaignData.campaign_id || existing?.campaignId || (merged as any)?.campaign_id;
+      if (campaignId) {
+        const statusToSync = campaignData.status || (merged as any)?.status || (merged as any)?.production?.status;
+        if (statusToSync) {
+          try {
+            await (prisma as any).campaign.updateMany({
+              where: { id: campaignId },
+              data: { status: statusToSync }
+            });
+            
+            await (prisma as any).producerResult.updateMany({
+              where: { campaignId: campaignId },
+              data: { status: statusToSync }
+            });
+          } catch (syncError) {
+            console.warn('[AIDirectorController] Background status sync failed:', syncError);
+          }
+        }
+      }
     }
 
     return res.json({ success: true, data: result });

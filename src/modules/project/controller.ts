@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import * as projectService from './service';
 
-export const getProjects = async (req: Request, res: Response) => {
+export const getProjects = async (req: any, res: Response) => {
   try {
-    const projects = await projectService.getAllProjects();
+    const userId = req.user?.id;
+    const projects = await projectService.getAllProjects(userId);
     res.json({ success: true, data: projects });
   } catch (error) {
     console.error(error);
@@ -11,9 +12,10 @@ export const getProjects = async (req: Request, res: Response) => {
   }
 };
 
-export const createProject = async (req: Request, res: Response) => {
+export const createProject = async (req: any, res: Response) => {
   try {
-    const project = await projectService.createProject(req.body);
+    const userId = req.user?.id;
+    const project = await projectService.createProject({ ...req.body, userId });
     res.status(201).json({ success: true, data: project });
   } catch (error) {
     console.error(error);

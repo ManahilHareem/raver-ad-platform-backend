@@ -1,8 +1,13 @@
 import prisma from '../../db/prisma';
 
-export const getAllProjects = async () => {
+export const getAllProjects = async (userId?: string) => {
+  const where: any = {};
+  if (userId) where.userId = userId;
+  
   return await prisma.project.findMany({
-    include: { campaigns: true }
+    where,
+    include: { campaigns: true },
+    orderBy: { createdAt: 'desc' }
   });
 };
 

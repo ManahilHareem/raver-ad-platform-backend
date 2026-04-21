@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import * as campaignService from './service';
 
-export const getCampaigns = async (req: Request, res: Response) => {
+export const getCampaigns = async (req: any, res: Response) => {
   try {
-    const campaigns = await campaignService.getAllCampaigns();
+    const userId = req.user?.id;
+    const campaigns = await campaignService.getAllCampaigns(userId);
     res.json({ success: true, data: campaigns });
   } catch (error) {
     console.error(error);

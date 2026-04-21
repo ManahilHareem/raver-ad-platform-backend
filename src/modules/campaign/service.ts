@@ -5,13 +5,18 @@ const isValidCampaignId = (id: string) => {
   return typeof id === 'string' && id.length > 0;
 };
 
-export const getAllCampaigns = async () => {
+export const getAllCampaigns = async (userId?: string) => {
   try {
+    const where: any = {};
+    if (userId) where.userId = userId;
+    
     return await prisma.campaign.findMany({
-      include: { metrics: true }
+      where,
+      include: { metrics: true },
+      orderBy: { createdAt: 'desc' }
     });
   } catch (error) {
-    console.error('Error fetching all campaigns:', error);
+    console.error('Error fetching campaigns:', error);
     throw new Error('Could not retrieve campaigns from database.');
   }
 };
@@ -40,6 +45,7 @@ export const createCampaign = async (data: any) => {
     const campaign = await prisma.campaign.create({
       data: {
         userId: data.userId,
+        projectId: data.projectId,
         name: data.name,
         objective: data.objective || data.config?.objective,
         audience: data.audience || data.config?.audience,
@@ -50,6 +56,8 @@ export const createCampaign = async (data: any) => {
         duration: data.duration || data.config?.duration,
         format: data.format || data.config?.format,
         budget: Number(data.budget) || 0,
+        startDate: data.startDate ? new Date(data.startDate) : null,
+        endDate: data.endDate ? new Date(data.endDate) : null,
         status: "draft",
         config: data.config
       }

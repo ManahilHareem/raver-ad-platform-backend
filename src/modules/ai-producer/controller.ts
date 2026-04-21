@@ -238,7 +238,7 @@ export const approveCampaign = async (req: AuthRequest, res: Response): Promise<
 
     let result;
     try {
-      result = await producerService.approveCampaign(campaign_id as string, body);
+      result = await producerService.approveStep(campaign_id as string, body);
     } catch (proxyError: any) {
       console.warn(`[AIProducerController] External approval failed for ${campaign_id}, proceeding with local update:`, proxyError.message);
 
@@ -311,6 +311,86 @@ export const approveCampaign = async (req: AuthRequest, res: Response): Promise<
 
     return res.json({ success: true, data: result });
   } catch (error: any) {
+    return res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+export const approveStep = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { session_id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const params = {
+      step_name: req.body.step_name || req.query.step_name,
+      action: req.body.action || req.query.action,
+      notes: req.body.notes || req.query.notes,
+      selected_asset_id: req.body.selected_asset_id
+    };
+
+    const result = await producerService.approveStep(session_id as string, params);
+
+    // 1. Sync the updated state to local DB tables
+    if (session_id && result && result.campaign) {
+      const campaignData = result.campaign;
+      const campaignId = campaignData.campaign_id;
+
+      try {
+        // Sync ProducerResult
+        const existingResult = await (prisma as any).producerResult.findUnique({ where: { campaignId: campaignId } });
+        
+        await (prisma as any).producerResult.upsert({
+          where: { campaignId: campaignId },
+          create: {
+            userId,
+            campaignId: campaignId,
+            sessionId: session_id,
+            status: campaignData.status,
+            result: result
+          },
+          update: {
+            status: campaignData.status,
+            result: {
+              ...(existingResult?.result || {}),
+              ...result,
+              production: {
+                ...(existingResult?.result?.production || {}),
+                ...(result.production || {})
+              }
+            }
+          }
+        });
+
+        // Sync Campaign
+        await (prisma as any).campaign.updateMany({
+          where: { id: campaignId },
+          data: { status: campaignData.status }
+        });
+
+        // Sync AISession if exists
+        await (prisma as any).aISession.updateMany({
+          where: { sessionId: session_id },
+          data: { metadata: result }
+        });
+
+        // Trigger notification
+        await createNotification({
+          userId,
+          type: `AI_PRODUCER_STEP_${params.action?.toUpperCase() || 'APPROVED'}`,
+          title: `Step ${params.action === 'improve' ? 'Feedback Sent' : 'Approved'}`,
+          message: `The "${params.step_name || 'current'}" step for campaign ${campaignId} has been ${params.action === 'improve' ? 'sent for improvement' : 'approved'}.`,
+          metadata: { campaignId, sessionId: session_id, step: params.step_name }
+        });
+      } catch (dbError) {
+        console.error('[AIProducerController] approveStep sync error:', dbError);
+      }
+    }
+
+    return res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[AIProducerController] Approve Step Error:', error);
     return res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
