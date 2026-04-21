@@ -516,6 +516,7 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
 
     // 3. Request AI response
     const aiRequestPayload = {
+      ...existingMetadata,
       message,
       session_id: existingSession?.sessionId,
       campaign_id: existingSession?.campaignId,
