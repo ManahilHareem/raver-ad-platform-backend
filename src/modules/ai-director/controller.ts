@@ -494,7 +494,6 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     }
 
     // 1. Load the existing session from DB using campaignId
-    //    session_id from request = campaignId in DB
     let existingHistory: any[] = [];
     let existingMetadata: any = {};
     let existingSession: any = null;
@@ -514,11 +513,20 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     const userMessage = { role: 'user', content: message || req.body.content };
     const updatedHistory = [...existingHistory, userMessage];
 
-    // 3. Request AI response
+    // 3. Generate a new session ID for the fork before requesting the AI Proxy
+    let newSessionId = existingSession?.sessionId || session_id;
+    if (existingSession && existingSession.sessionId) {
+      const baseSessionId = existingSession.sessionId.includes('_') 
+        ? existingSession.sessionId.split('_')[0] 
+        : existingSession.sessionId;
+      newSessionId = `${baseSessionId}_${Date.now()}`;
+    }
+
+    // 4. Request AI response
     const aiRequestPayload = {
       ...existingMetadata,
       message,
-      session_id: existingSession?.sessionId,
+      session_id: newSessionId,
       campaign_id: existingSession?.campaignId,
       history: updatedHistory
     };
@@ -532,14 +540,14 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
       result.voice = detectedVoice;
     }
 
-    // 4. Append Assistant Message
+    // 5. Append Assistant Message
     const assistantMessage = {
       role: 'assistant',
       content: result.message || result.content || (typeof result === 'string' ? result : JSON.stringify(result))
     };
     const finalHistory = [...updatedHistory, assistantMessage];
 
-    // 5. Save as a NEW session in DB, branching off the previous one
+    // 6. Save as a NEW session in DB, branching off the previous one
     if (existingSession) {
       // Treat the new result as the single entity source of truth, avoiding deep-merge of old production state
       const newState = {
@@ -553,15 +561,6 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
       newState.production.status = 'in_production';
       newState.campaign_status = 'in_production';
       newState.status = 'in_production';
-
-      // Ensure a unique session ID for the new fork
-      let newSessionId = result.session_id;
-      if (!newSessionId || newSessionId === existingSession.sessionId) {
-        const baseSessionId = existingSession.sessionId.includes('_') 
-          ? existingSession.sessionId.split('_')[0] 
-          : existingSession.sessionId;
-        newSessionId = `${baseSessionId}_${Date.now()}`;
-      }
       newState.session_id = newSessionId;
 
       await (prisma as any).aISession.create({
