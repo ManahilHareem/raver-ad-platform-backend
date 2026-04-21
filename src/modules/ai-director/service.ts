@@ -5,7 +5,7 @@ export const chat = (body: any) => proxyPost('/api/v1/director/chat', body);
 export const getSession = (sessionId: string) => proxyGet(`/api/v1/director/session/${sessionId}`);
 export const getUpdate = (sessionId: string) => proxyGet(`/api/v1/director/session/${sessionId}/update`);
 export const listSessions = () => proxyGet('/api/v1/director/sessions');
-export const regenerateChat = (body: any) => proxyPost('/api/v1/director/chat', body);
+export const regenerateChat = (body: any) => proxyPost('/api/v1/director/regenerate-chat', body);
 export const approveStep = (sessionId: string, params: { step_name?: string, action?: string, notes?: string }) => {
   const query = new URLSearchParams(params as Record<string, string>).toString();
   return proxyPost(`/api/v1/director/session/${sessionId}/approve-step?${query}`, {});

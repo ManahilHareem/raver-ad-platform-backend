@@ -562,6 +562,35 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
       newState.campaign_status = 'in_production';
       newState.status = 'in_production';
       newState.session_id = newSessionId;
+      
+      // Explicitly clear old assets that might have been copied from existingMetadata
+      newState.video_url = null;
+      newState.music_url = null;
+      newState.voiceover_url = null;
+      newState.image_urls = [];
+      newState.s3_assets = null;
+      newState.result = null;
+
+      newState.production.video_url = null;
+      newState.production.music_url = null;
+      newState.production.voiceover_url = null;
+      newState.production.image_urls = [];
+      newState.production.scene_videos = [];
+      newState.production.completed_nodes = [];
+      newState.completed_nodes = [];
+
+      newState.step_approvals = {};
+
+      if (newState.nodes) {
+        for (const key of Object.keys(newState.nodes)) {
+          if (newState.nodes[key]) {
+            newState.nodes[key].status = 'pending';
+            if (newState.nodes[key].result) {
+              newState.nodes[key].result = null;
+            }
+          }
+        }
+      }
 
       await (prisma as any).aISession.create({
         data: {
