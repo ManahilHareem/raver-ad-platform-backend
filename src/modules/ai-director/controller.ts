@@ -538,7 +538,7 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     };
     const finalHistory = [...updatedHistory, assistantMessage];
 
-    // 5. Update the SAME session in DB — always persist history and status
+    // 5. Save as a NEW session in DB, branching off the previous one
     if (existingSession) {
       const merged = mergeMetadata(existingMetadata, { ...result, history: finalHistory });
 
@@ -548,9 +548,54 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
       merged.campaign_status = 'in_production';
       merged.status = 'in_production';
 
-      await (prisma as any).aISession.update({
-        where: { sessionId: existingSession.sessionId },
-        data: { metadata: merged }
+      // Clear previously generated assets so they don't bleed into the new session
+      merged.video_url = null;
+      merged.music_url = null;
+      merged.voiceover_url = null;
+      merged.image_urls = [];
+      merged.s3_assets = null;
+      merged.result = null;
+      
+      merged.production.video_url = null;
+      merged.production.music_url = null;
+      merged.production.voiceover_url = null;
+      merged.production.image_urls = [];
+      merged.production.scene_videos = [];
+      
+      // Clear step approvals for the new fork
+      merged.step_approvals = {};
+
+      // Clear nodes' results so frontend knows they are recalculating
+      if (merged.nodes) {
+          for (const key of Object.keys(merged.nodes)) {
+              if (merged.nodes[key]) {
+                  merged.nodes[key].status = 'pending';
+                  // Keep the node structure but clear the result
+                  if (merged.nodes[key].result) {
+                      merged.nodes[key].result = null;
+                  }
+              }
+          }
+      }
+
+      // Ensure a unique session ID for the new fork
+      let newSessionId = result.session_id;
+      if (!newSessionId || newSessionId === existingSession.sessionId) {
+        const baseSessionId = existingSession.sessionId.includes('_') 
+          ? existingSession.sessionId.split('_')[0] 
+          : existingSession.sessionId;
+        newSessionId = `${baseSessionId}_${Date.now()}`;
+      }
+      merged.session_id = newSessionId;
+
+      await (prisma as any).aISession.create({
+        data: {
+          userId,
+          sessionId: newSessionId,
+          type: 'director',
+          campaignId: existingSession.campaignId,
+          metadata: merged
+        }
       });
 
       return res.json({ success: true, data: merged });
