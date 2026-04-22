@@ -662,6 +662,16 @@ export const approveStep = async (req: AuthRequest, res: Response): Promise<any>
 
       const merged = mergeMetadata(existing?.metadata, campaignData);
       
+      // Detect voice override in notes and persist it
+      const detectedVoice = detectVoice(params.notes);
+
+      console.log("detectedVoice", detectedVoice);
+      if (detectedVoice) {
+        if (!merged.brief_draft) merged.brief_draft = {};
+        merged.brief_draft.voice = detectedVoice;
+        merged.voice = detectedVoice;
+      }
+      
       // Ensure we keep track of the specific step approvals in the metadata
       merged.step_approvals = campaignData.step_approvals || merged.step_approvals || {};
 
