@@ -9,11 +9,16 @@ const BASE_URL = (process.env.AI_BACKEND_URL || 'https://apiplatform.raver.ai').
 export const proxyPost = async (path: string, body: any) => {
   const fullUrl = `${BASE_URL}${path}`;
   try {
-    const payload = body || {}; // Ensure we always send at least an empty object if undefined
-    // console.log(`[AIProxy] Forwarding POST request to ${fullUrl} with body:`, JSON.stringify(payload, null, 2));
+    const payload = body || {}; 
+    
+    const headers: any = {};
+    if (!(payload instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     const response = await axios.post(fullUrl, payload, {
-      headers: { 'Content-Type': 'application/json' },
-      timeout: Number(process.env.API_TIMEOUT) || 600000, // 10 min timeout for long AI generation tasks
+      headers,
+      timeout: Number(process.env.API_TIMEOUT) || 600000, 
     });
     // console.log(`[AIProxy] Received successful response from ${fullUrl}:`, JSON.stringify(response.data, null, 2));
     return response.data;
@@ -48,6 +53,23 @@ export const proxyGet = async (path: string) => {
       throw { status: axiosErr.response.status, message: JSON.stringify(data), data };
     }
     // console.error(`[AIProxy] Failed to reach AI backend ${fullUrl}:`, axiosErr.message);
+    throw { status: 503, message: 'Failed to communicate with AI service' };
+  }
+};
+
+export const proxyDelete = async (path: string) => {
+  const fullUrl = `${BASE_URL}${path}`;
+  try {
+    const response = await axios.delete(fullUrl, {
+      timeout: 30000,
+    });
+    return response.data;
+  } catch (error) {
+    const axiosErr = error as AxiosError;
+    if (axiosErr.response) {
+      const data = axiosErr.response.data as any;
+      throw { status: axiosErr.response.status, message: JSON.stringify(data), data };
+    }
     throw { status: 503, message: 'Failed to communicate with AI service' };
   }
 };
