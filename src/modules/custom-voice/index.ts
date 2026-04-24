@@ -14,7 +14,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 /**
  * @swagger
- * /api/v1/custom-voice/clone:
+ * /api/custom-voice/clone:
  *   post:
  *     summary: Clone Voice
  *     tags: [CustomVoice]
@@ -28,7 +28,7 @@ router.post('/clone', upload.array('files'), Controller.cloneVoice);
 
 /**
  * @swagger
- * /api/v1/custom-voice/record:
+ * /api/custom-voice/record:
  *   post:
  *     summary: Clone Voice From Recording
  *     tags: [CustomVoice]
@@ -42,7 +42,7 @@ router.post('/record', upload.array('files'), Controller.cloneVoiceFromRecording
 
 /**
  * @swagger
- * /api/v1/custom-voice/list:
+ * /api/custom-voice/list:
  *   get:
  *     summary: List Voices
  *     tags: [CustomVoice]
@@ -56,7 +56,7 @@ router.get('/list', Controller.listVoices);
 
 /**
  * @swagger
- * /api/v1/custom-voice/{voice_id}:
+ * /api/custom-voice/{voice_id}:
  *   get:
  *     summary: Get Voice Details
  *     tags: [CustomVoice]
@@ -76,7 +76,7 @@ router.get('/:voice_id', Controller.getVoiceDetails);
 
 /**
  * @swagger
- * /api/v1/custom-voice/{voice_id}:
+ * /api/custom-voice/{voice_id}:
  *   delete:
  *     summary: Delete Custom Voice
  *     tags: [CustomVoice]
@@ -96,7 +96,7 @@ router.delete('/:voice_id', Controller.deleteCustomVoice);
 
 /**
  * @swagger
- * /api/v1/custom-voice/{voice_id}/test:
+ * /api/custom-voice/{voice_id}/test:
  *   post:
  *     summary: Test Voice
  *     tags: [CustomVoice]

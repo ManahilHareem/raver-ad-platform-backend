@@ -79,6 +79,6 @@ app.use('/api/ai/director', authMiddleware, aiDirectorRoutes);
 app.use('/api/ai/insights', authMiddleware, aiInsightsRoutes);
 app.use('/api/ai/quality', authMiddleware, aiQualityRoutes);
 app.use('/api/analytics', authMiddleware, analyticsRoutes);
-app.use('/api/v1/custom-voice', authMiddleware, customVoiceRoutes);
+app.use('/api/custom-voice', authMiddleware, customVoiceRoutes);
 
 export default app;

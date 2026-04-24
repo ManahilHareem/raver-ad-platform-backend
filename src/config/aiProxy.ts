@@ -43,7 +43,7 @@ export const proxyGet = async (path: string) => {
     const response = await axios.get(fullUrl, {
       timeout: 30000,
     });
-    // console.log(`[AIProxy] Received successful response from ${fullUrl}:`, JSON.stringify(response.data));
+    console.log(`[AIProxy] Received successful response from ${fullUrl}:`, JSON.stringify(response.data));
     return response.data;
   } catch (error) {
     const axiosErr = error as AxiosError;
