@@ -158,7 +158,7 @@ export const approveSession = async (req: AuthRequest, res: Response): Promise<a
               where: { id: campaignId },
               data: { status: 'approved' }
             });
-            
+
             await (prisma as any).producerResult.updateMany({
               where: { campaignId: campaignId },
               data: { status: 'approved' }
@@ -384,7 +384,7 @@ export const getDbUpdate = async (req: AuthRequest, res: Response): Promise<any>
     }
 
     const local = await (prisma as any).aISession.findUnique({ where: { sessionId: session_id as string } });
-    
+
     if (!local) {
       return res.status(404).json({ success: false, message: 'Session not found in local database' });
     }
@@ -522,8 +522,8 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     const updatedHistory = [...existingHistory, userMessage];
 
     // Ensure we don't stack underscores. We generate the NEW session ID here.
-    const baseSessionId = existingSession.sessionId.includes('_') 
-      ? existingSession.sessionId.split('_')[0] 
+    const baseSessionId = existingSession.sessionId.includes('_')
+      ? existingSession.sessionId.split('_')[0]
       : existingSession.sessionId;
     const cleanSessionIdForProxy = `${baseSessionId}_${Date.now()}`;
 
@@ -554,7 +554,7 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
 
     // 5. Use the session ID we sent to the proxy (or what the proxy returns)
     let newSessionId = result.session_id || cleanSessionIdForProxy;
-    
+
     // Safety check: if the proxy somehow returns a stacked ID, fix it
     if (newSessionId.split('_').length > 2) {
       const parts = newSessionId.split('_');
@@ -572,7 +572,7 @@ export const regenerateChat = async (req: AuthRequest, res: Response): Promise<a
     merged.status = 'in_production';
     merged.campaign_id = newCampaignId;
     merged.session_id = newSessionId;
-    
+
     // Explicitly clear old assets from merged so they don't persist in the new session
     merged.video_url = null;
     merged.music_url = null;
@@ -655,13 +655,13 @@ export const approveStep = async (req: AuthRequest, res: Response): Promise<any>
     // 1. Persist the updated state to DB
     if (session_id && result && result.campaign) {
       const campaignData = result.campaign;
-      
+
       const existing = await (prisma as any).aISession.findUnique({
         where: { sessionId: session_id as string }
       });
 
       const merged = mergeMetadata(existing?.metadata, campaignData);
-      
+
       // Detect voice override in notes and persist it
       const detectedVoice = detectVoice(params.notes);
 
@@ -671,16 +671,16 @@ export const approveStep = async (req: AuthRequest, res: Response): Promise<any>
         merged.brief_draft.voice = detectedVoice;
         merged.voice = detectedVoice;
       }
-      
+
       // Ensure we keep track of the specific step approvals in the metadata
       merged.step_approvals = campaignData.step_approvals || merged.step_approvals || {};
 
       await (prisma as any).aISession.upsert({
         where: { sessionId: session_id as string },
-        update: { 
-          metadata: merged, 
-          userId, 
-          campaignId: campaignData.campaign_id || existing?.campaignId 
+        update: {
+          metadata: merged,
+          userId,
+          campaignId: campaignData.campaign_id || existing?.campaignId
         },
         create: {
           userId,
@@ -701,7 +701,7 @@ export const approveStep = async (req: AuthRequest, res: Response): Promise<any>
               where: { id: campaignId },
               data: { status: statusToSync }
             });
-            
+
             await (prisma as any).producerResult.updateMany({
               where: { campaignId: campaignId },
               data: { status: statusToSync }

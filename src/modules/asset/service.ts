@@ -6,12 +6,13 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 export const getAllAssets = async (userId: string) => {
   try {
     // 1. Fetch from diverse source tables
-    const [standardAssets, images, audios, editors, producers] = await Promise.all([
+    const [standardAssets, images, audios, editors, producers, directorSessions] = await Promise.all([
       prisma.asset.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
       (prisma as any).imageLeadResult.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
       (prisma as any).audioLeadResult.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
       (prisma as any).editorResult.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
       (prisma as any).producerResult.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+      (prisma as any).aISession.findMany({ where: { userId, type: 'director' }, orderBy: { createdAt: 'desc' } }),
     ]);
 
     // 2. Normalize agent results into Asset objects
@@ -126,7 +127,78 @@ export const getAllAssets = async (userId: string) => {
         fileSize: 15728640,
         rawMetadata: p.result,
         dbId: p.id
-      }))
+      })),
+      ...directorSessions.flatMap((s: any) => {
+        const metadata = (s.metadata as any) || {};
+        const production = metadata.production || {};
+        const items: any[] = [];
+        
+        const video = production.video_url || metadata.video_url;
+        if (video) items.push({
+          id: `${s.id}-video`,
+          userId: s.userId,
+          campaignId: s.campaignId,
+          type: 'video',
+          name: `Director Render - ${s.sessionId?.substring(0, 8)}`,
+          url: video,
+          createdAt: s.createdAt,
+          origin: 'AI Director',
+          fileSize: 15728640,
+          rawMetadata: metadata,
+          dbId: s.id
+        });
+
+        const music = production.music_url || metadata.music_url;
+        if (music) items.push({
+          id: `${s.id}-music`,
+          userId: s.userId,
+          campaignId: s.campaignId,
+          type: 'audio',
+          name: `Director Music - ${s.sessionId?.substring(0, 8)}`,
+          url: music,
+          createdAt: s.createdAt,
+          origin: 'AI Director',
+          fileSize: 1572864,
+          rawMetadata: metadata,
+          dbId: s.id
+        });
+
+        const voice = production.voiceover_url || metadata.voiceover_url;
+        if (voice) items.push({
+          id: `${s.id}-voice`,
+          userId: s.userId,
+          campaignId: s.campaignId,
+          type: 'audio',
+          name: `Director Voice - ${s.sessionId?.substring(0, 8)}`,
+          url: voice,
+          createdAt: s.createdAt,
+          origin: 'AI Director',
+          fileSize: 1048576,
+          rawMetadata: metadata,
+          dbId: s.id
+        });
+
+        const images = production.image_urls || metadata.image_urls || [];
+        if (Array.isArray(images)) {
+          images.forEach((url, idx) => {
+            items.push({
+              id: `${s.id}-img-${idx}`,
+              userId: s.userId,
+              campaignId: s.campaignId,
+              type: 'image',
+              name: `Director Image ${idx + 1} - ${s.sessionId?.substring(0, 8)}`,
+              url: url,
+              createdAt: s.createdAt,
+              origin: 'AI Director',
+              fileSize: 524288,
+              rawMetadata: metadata,
+              dbId: s.id
+            });
+          });
+        }
+
+        return items;
+      })
     ];
 
     // 3. Process and normalize with background sync for sizes
@@ -341,6 +413,11 @@ export const syncAssetSize = async (asset: any) => {
           await (prisma as any).producerResult.update({
             where: { id: asset.dbId || asset.id },
             data: { result: { ...(asset.rawMetadata || {}), actualSize } }
+          });
+        } else if (asset.origin === 'AI Director') {
+          await (prisma as any).aISession.update({
+            where: { id: asset.dbId || asset.id },
+            data: { metadata: { ...(asset.rawMetadata || {}), actualSize } }
           });
         }
       } catch (e) {
