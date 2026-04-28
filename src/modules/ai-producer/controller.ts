@@ -298,10 +298,14 @@ export const approveCampaign = async (req: AuthRequest, res: Response): Promise<
         status: status,
         result: {
           ...(localResult.result as any || {}),
+          ...result,
+          production: {
+            ...((localResult.result as any)?.production || {}),
+            ...(result.production || {})
+          },
           approval: {
             approved: body.approved !== false,
-            notes: body.notes || '',
-            result: result
+            notes: body.notes || ''
           }
         }
       }

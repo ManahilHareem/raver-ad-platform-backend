@@ -115,19 +115,81 @@ export const getAllAssets = async (userId: string) => {
         rawMetadata: e.metadata,
         dbId: e.id
       })),
-      ...producers.filter((p: any) => p.result && (p.result.video_url || p.result.videoUrl)).map((p: any) => ({
-        id: p.id,
-        userId: p.userId,
-        campaignId: p.campaignId,
-        type: 'video',
-        name: `Production Final - ${p.sessionId?.substring(0, 8) || 'Export'}`,
-        url: p.result.video_url || p.result.videoUrl,
-        createdAt: p.createdAt,
-        origin: 'AI Producer',
-        fileSize: 15728640,
-        rawMetadata: p.result,
-        dbId: p.id
-      })),
+      ...producers.flatMap((p: any) => {
+        const resultData = (p.result as any) || {};
+        const production = resultData.production || {};
+        const items: any[] = [];
+        
+        // Extract Video
+        const video = production.video_url || resultData.video_url || production.videoUrl || resultData.videoUrl;
+        if (video) items.push({
+          id: `${p.id}-video`,
+          userId: p.userId,
+          campaignId: p.campaignId,
+          type: 'video',
+          name: `Production Final - ${p.sessionId?.substring(0, 8) || 'Export'}`,
+          url: video,
+          createdAt: p.createdAt,
+          origin: 'AI Producer',
+          fileSize: 15728640,
+          rawMetadata: resultData,
+          dbId: p.id
+        });
+
+        // Extract Music
+        const music = production.music_url || resultData.music_url || production.musicUrl || resultData.musicUrl;
+        if (music) items.push({
+          id: `${p.id}-music`,
+          userId: p.userId,
+          campaignId: p.campaignId,
+          type: 'audio',
+          name: `Production Music - ${p.sessionId?.substring(0, 8) || 'Score'}`,
+          url: music,
+          createdAt: p.createdAt,
+          origin: 'AI Producer',
+          fileSize: 1572864,
+          rawMetadata: resultData,
+          dbId: p.id
+        });
+
+        // Extract Voiceover
+        const voice = production.voiceover_url || resultData.voiceover_url || production.voiceoverUrl || resultData.voiceoverUrl;
+        if (voice) items.push({
+          id: `${p.id}-voice`,
+          userId: p.userId,
+          campaignId: p.campaignId,
+          type: 'audio',
+          name: `Production Voice - ${p.sessionId?.substring(0, 8) || 'Voice'}`,
+          url: voice,
+          createdAt: p.createdAt,
+          origin: 'AI Producer',
+          fileSize: 1048576,
+          rawMetadata: resultData,
+          dbId: p.id
+        });
+
+        // Extract Images
+        const images = production.image_urls || resultData.image_urls || production.imageUrls || resultData.imageUrls || [];
+        if (Array.isArray(images)) {
+          images.forEach((url, idx) => {
+            items.push({
+              id: `${p.id}-img-${idx}`,
+              userId: p.userId,
+              campaignId: p.campaignId,
+              type: 'image',
+              name: `Production Image ${idx + 1} - ${p.sessionId?.substring(0, 8) || 'Asset'}`,
+              url: url,
+              createdAt: p.createdAt,
+              origin: 'AI Producer',
+              fileSize: 524288,
+              rawMetadata: resultData,
+              dbId: p.id
+            });
+          });
+        }
+
+        return items;
+      }),
       ...directorSessions.flatMap((s: any) => {
         const metadata = (s.metadata as any) || {};
         const production = metadata.production || {};
