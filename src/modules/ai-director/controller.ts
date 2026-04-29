@@ -404,6 +404,11 @@ export const getDbUpdate = async (req: AuthRequest, res: Response): Promise<any>
     }
 
     const metadata = (local.metadata as any) || {};
+
+    if (metadata.is_deleted) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
     const status = metadata.status || metadata.production?.status || (metadata.campaign_status);
 
     return res.json({

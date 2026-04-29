@@ -137,8 +137,10 @@ export const deleteCampaign = async (id: string) => {
     await (prisma as any).copyLeadResult.deleteMany({ where: { campaignId: id } });
     await (prisma as any).editorResult.deleteMany({ where: { campaignId: id } });
 
-    // Delete AI Director session history (critical for clearing the sessions dashboard)
-    await (prisma as any).aISession.deleteMany({
+    // Soft-delete AI Director sessions (mark as deleted instead of removing).
+    // Hard-deleting causes resurrection: the frontend polls getSession/getUpdate,
+    // which falls through to the external AI Proxy and re-creates the row via upsert.
+    const sessionsToDelete = await (prisma as any).aISession.findMany({
       where: {
         OR: [
           { campaignId: id },
@@ -147,6 +149,18 @@ export const deleteCampaign = async (id: string) => {
         ]
       }
     });
+    for (const session of sessionsToDelete) {
+      const currentMetadata = typeof session.metadata === 'object' && session.metadata !== null ? session.metadata : {};
+      await (prisma as any).aISession.update({
+        where: { id: session.id },
+        data: {
+          metadata: {
+            ...currentMetadata,
+            is_deleted: true
+          }
+        }
+      });
+    }
 
     // 2. Finally, delete the campaign itself
     return await prisma.campaign.deleteMany({
