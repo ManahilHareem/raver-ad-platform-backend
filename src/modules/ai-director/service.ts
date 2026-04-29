@@ -14,19 +14,36 @@ export const approveStep = (sessionId: string, params: { step_name?: string, act
 export const deleteSession = async (sessionId: string) => {
   try {
     // We use deleteMany to avoid throwing an error if the session was already deleted
-    const result = await (prisma as any).aISession.deleteMany({
-      where: {
-        OR: [
-          { sessionId: sessionId },
-          { campaignId: sessionId },
-          { sessionId: { startsWith: sessionId + '_' } } // Support versioned session IDs
-        ]
-      }
-    });
+    const whereClause = {
+      OR: [
+        { sessionId: sessionId },
+        { campaignId: sessionId },
+        { sessionId: { startsWith: sessionId + '_' } } // Support versioned session IDs
+      ]
+    };
+
+    const [sessionResult, producerResult, audioResult, copyResult, editorResult, imageResult, qualityResult] = await Promise.all([
+      (prisma as any).aISession.deleteMany({ where: whereClause }),
+      (prisma as any).producerResult.deleteMany({ where: { OR: [{ sessionId: sessionId }, { campaignId: sessionId }] } }),
+      (prisma as any).audioLeadResult.deleteMany({ where: { OR: [{ sessionId: sessionId }, { campaignId: sessionId }] } }),
+      (prisma as any).copyLeadResult.deleteMany({ where: { OR: [{ sessionId: sessionId }, { campaignId: sessionId }] } }),
+      (prisma as any).editorResult.deleteMany({ where: { OR: [{ sessionId: sessionId }, { campaignId: sessionId }] } }),
+      (prisma as any).imageLeadResult.deleteMany({ where: { OR: [{ sessionId: sessionId }, { campaignId: sessionId }] } }),
+      (prisma as any).qualityLeadResult.deleteMany({ where: { OR: [{ sessionId: sessionId }, { campaignId: sessionId }] } })
+    ]);
+
     return { 
       success: true, 
-      message: `Session ${sessionId} cleared successfully from local database`,
-      count: result.count 
+      message: `Session ${sessionId} and related results cleared successfully from local database`,
+      counts: {
+        sessions: sessionResult.count,
+        producerResults: producerResult.count,
+        audioResults: audioResult.count,
+        copyResults: copyResult.count,
+        editorResults: editorResult.count,
+        imageResults: imageResult.count,
+        qualityResults: qualityResult.count
+      }
     };
   } catch (error) {
     console.error(`[AIDirectorService] Error deleting session ${sessionId}:`, error);
