@@ -205,6 +205,11 @@ export const getSession = async (req: AuthRequest, res: Response): Promise<any> 
     const local = await (prisma as any).aISession.findUnique({ where: { sessionId: session_id as string } });
     if (local) {
       const metadata = (local.metadata as any) || {};
+      
+      if (metadata.is_deleted) {
+        return res.status(404).json({ success: false, message: 'Session not found' });
+      }
+
       const history = metadata.history || [];
       const prompt = history.find((m: any) => m.role === 'user')?.content || '';
 
@@ -294,6 +299,11 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
       }
 
       const metadata = (local.metadata as any) || {};
+      
+      if (metadata.is_deleted) {
+        return res.status(404).json({ success: false, message: 'Session not found' });
+      }
+
       const status = metadata.status || metadata.production?.status || (metadata.campaign_status);
 
       // If already approved or ready, return local state without redundant proxy hit
@@ -427,7 +437,9 @@ export const listSessions = async (req: AuthRequest, res: Response): Promise<any
       orderBy: { createdAt: 'desc' }
     });
 
-    const formatted = sessions.map((s: any) => {
+    const formatted = sessions
+      .filter((s: any) => !(s.metadata as any)?.is_deleted)
+      .map((s: any) => {
       const metadata = (s.metadata as any) || {};
       const history = metadata.history || [];
       const prompt = history.find((m: any) => m.role === 'user')?.content || '';
