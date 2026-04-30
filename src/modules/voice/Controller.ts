@@ -33,3 +33,23 @@ export const getVoiceById = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const generateTTS = async (req: Request, res: Response) => {
+  try {
+    const { text, voice_id = 'EXAVITQu4vr4xnSDxMaL' } = req.body; 
+    if (!text) {
+      return res.status(400).json({ success: false, message: 'Text is required' });
+    }
+    const audioBuffer = await ElevenLabsService.generateElevenLabsTTS(voice_id, text);
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': audioBuffer.length,
+    });
+    return res.send(audioBuffer);
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Internal Server Error',
+    });
+  }
+};

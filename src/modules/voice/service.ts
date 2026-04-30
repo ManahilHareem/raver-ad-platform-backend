@@ -33,3 +33,38 @@ export const fetchElevenLabsVoice = async (voiceId: string) => {
     throw new Error('Failed to retrieve voice from ElevenLabs.');
   }
 };
+
+export const generateElevenLabsTTS = async (voiceId: string, text: string) => {
+  try {
+    const response = await axios.post(
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      {
+        text,
+        model_id: "eleven_turbo_v2_5",
+        voice_settings: { stability: 0.5, similarity_boost: 0.5 }
+      },
+      {
+        headers: {
+          'Accept': 'audio/mpeg',
+          'xi-api-key': process.env.ELEVEN_LABS_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        responseType: 'arraybuffer'
+      }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error generating TTS from ElevenLabs:', error.response?.data?.toString() || error.message);
+    let errorDetails = 'Failed to generate TTS from ElevenLabs.';
+    if (error.response?.data) {
+        try {
+            const dataStr = Buffer.from(error.response.data).toString('utf8');
+            errorDetails += ' ' + dataStr;
+            console.error('ElevenLabs response body:', dataStr);
+        } catch (e) {
+            // ignore
+        }
+    }
+    throw new Error(errorDetails);
+  }
+};

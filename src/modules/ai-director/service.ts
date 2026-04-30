@@ -25,7 +25,6 @@ export const deleteSession = async (sessionId: string) => {
     // Hard-delete aISession records permanently
     const sessionResult = await (prisma as any).aISession.deleteMany({ where: whereClause });
     const sessionCount = sessionResult.count;
-    console.log("sessionCount", sessionCount);
     const [producerResult, audioResult, copyResult, editorResult, imageResult, qualityResult] = await Promise.all([
       (prisma as any).producerResult.deleteMany({ where: { OR: [{ sessionId: sessionId }, { campaignId: sessionId }] } }),
       (prisma as any).audioLeadResult.deleteMany({ where: { OR: [{ sessionId: sessionId }, { campaignId: sessionId }] } }),

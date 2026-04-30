@@ -44,4 +44,36 @@ router.get('/get-voices', Controller.getVoices);
  */
 router.get('/get-voice/:voice_id', Controller.getVoiceById);
 
+/**
+ * @swagger
+ * /api/voice/generate-tts:
+ *   post:
+ *     summary: Generate text-to-speech using Eleven Labs
+ *     tags: [Voice]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [text]
+ *             properties:
+ *               text:
+ *                 type: string
+ *               voice_id:
+ *                 type: string
+ *                 default: '21m00Tcm4TlvDq8ikWAM'
+ *     responses:
+ *       200:
+ *         description: Audio file
+ *         content:
+ *           audio/mpeg:
+ *             schema:
+ *               type: string
+ *               format: binary
+ */
+router.post('/generate-tts', Controller.generateTTS);
+
 export default router;
