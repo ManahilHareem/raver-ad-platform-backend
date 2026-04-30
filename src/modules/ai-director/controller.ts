@@ -15,6 +15,8 @@ const mergeMetadata = (existing: any, incoming: any) => {
   return {
     ...base,
     ...data,
+    // Preserve soft-delete flag — incoming proxy data must never overwrite it
+    is_deleted: base.is_deleted || data.is_deleted || false,
     production: {
       ...(base.production || {}),
       ...(data.production || (data.video_url ? data : {})),
@@ -59,7 +61,11 @@ export const chat = async (req: AuthRequest, res: Response): Promise<any> => {
     if (lookupId) {
       const session = await (prisma as any).aISession.findUnique({ where: { sessionId: lookupId } });
       if (session) {
-        existingMetadata = session.metadata || {};
+        const sessionMeta = session.metadata || {};
+        if (sessionMeta.is_deleted) {
+          return res.status(404).json({ success: false, message: 'Session not found' });
+        }
+        existingMetadata = sessionMeta;
         existingHistory = Array.isArray(existingMetadata.history) ? existingMetadata.history : [];
       }
     }
@@ -238,6 +244,22 @@ export const getSession = async (req: AuthRequest, res: Response): Promise<any> 
     }
 
     if (userId && session_id) {
+      // Guard: Check if a soft-deleted record exists for this session ID (or base ID).
+      // The proxy still knows about it, but we must NOT resurrect it locally.
+      const deletedCheck = await (prisma as any).aISession.findFirst({
+        where: {
+          OR: [
+            { sessionId: session_id as string },
+            { campaignId: session_id as string },
+            { sessionId: { startsWith: (session_id as string).split('_')[0] } }
+          ],
+          metadata: { path: ['is_deleted'], equals: true }
+        }
+      });
+      if (deletedCheck) {
+        return res.status(404).json({ success: false, message: 'Session not found' });
+      }
+
       const isMissing = result.message?.includes('No active campaign') || (result.status === null && result.campaign_id === null);
       if (isMissing) {
         if (local) {
@@ -332,6 +354,22 @@ export const getUpdate = async (req: AuthRequest, res: Response): Promise<any> =
 
     // 3. Conditional Persistence: Only save to DB if it's ready for review (Production complete)
     if (userId && session_id) {
+      // Guard: Check if a soft-deleted record exists for this session ID.
+      // The proxy still knows about it, but we must NOT resurrect it locally.
+      const deletedCheck = local || await (prisma as any).aISession.findFirst({
+        where: {
+          OR: [
+            { sessionId: session_id as string },
+            { campaignId: session_id as string },
+            { sessionId: { startsWith: (session_id as string).split('_')[0] } }
+          ],
+          metadata: { path: ['is_deleted'], equals: true }
+        }
+      });
+      if (deletedCheck && (deletedCheck.metadata as any)?.is_deleted) {
+        return res.status(404).json({ success: false, message: 'Session not found' });
+      }
+
       const isMissing = result.message?.includes('No active campaign') || (result.status === null && result.campaign_id === null);
       if (isMissing) {
         // If proxy doesn't see it but we do, return local. Otherwise return proxy message.
@@ -437,7 +475,7 @@ export const listSessions = async (req: AuthRequest, res: Response): Promise<any
     const sessions = await (prisma as any).aISession.findMany({
       where: {
         userId,
-        type: 'director'
+        type: 'director',
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -481,14 +519,14 @@ export const deleteSession = async (req: AuthRequest, res: Response): Promise<an
         ]
       }
     });
-
+    console.log("loacl session",localSession);
     if (localSession && localSession.userId !== userId) {
       return res.status(403).json({ success: false, message: 'Unauthorized to delete this session.' });
     }
 
     // The service now handles the database deletion using deleteMany for safety
     const result = await directorService.deleteSession(session_id as string);
-
+    console.log("result",result);
     return res.json(result);
   } catch (error: any) {
     console.error('[AIDirectorController] Error deleting session:', error);

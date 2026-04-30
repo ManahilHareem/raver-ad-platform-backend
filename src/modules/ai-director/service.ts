@@ -22,23 +22,10 @@ export const deleteSession = async (sessionId: string) => {
       ]
     };
 
-    // Soft-delete aISession to prevent resurrection by UI polling the external AI Proxy
-    const sessionsToSoftDelete = await (prisma as any).aISession.findMany({ where: whereClause });
-    let sessionCount = 0;
-    for (const session of sessionsToSoftDelete) {
-        const currentMetadata = typeof session.metadata === 'object' && session.metadata !== null ? session.metadata : {};
-        await (prisma as any).aISession.update({
-            where: { id: session.id },
-            data: {
-                metadata: {
-                    ...currentMetadata,
-                    is_deleted: true
-                }
-            }
-        });
-        sessionCount++;
-    }
-
+    // Hard-delete aISession records permanently
+    const sessionResult = await (prisma as any).aISession.deleteMany({ where: whereClause });
+    const sessionCount = sessionResult.count;
+    console.log("sessionCount", sessionCount);
     const [producerResult, audioResult, copyResult, editorResult, imageResult, qualityResult] = await Promise.all([
       (prisma as any).producerResult.deleteMany({ where: { OR: [{ sessionId: sessionId }, { campaignId: sessionId }] } }),
       (prisma as any).audioLeadResult.deleteMany({ where: { OR: [{ sessionId: sessionId }, { campaignId: sessionId }] } }),
@@ -50,7 +37,7 @@ export const deleteSession = async (sessionId: string) => {
 
     return { 
       success: true, 
-      message: `Session ${sessionId} marked as deleted and related results cleared`,
+      message: `Session ${sessionId} permanently deleted along with related results`,
       counts: {
         sessions: sessionCount,
         producerResults: producerResult.count,
