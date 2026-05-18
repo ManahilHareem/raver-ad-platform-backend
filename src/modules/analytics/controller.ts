@@ -30,8 +30,8 @@ export const getPlatformAnalytics = async (req: AuthRequest, res: Response): Pro
     ]);
 
     // 2. Aggregate metrics for Top Stats
-    const totalImpressions = userMetrics.reduce((sum, m) => sum + (m.impressions || 0), 0);
-    const totalClicks = userMetrics.reduce((sum, m) => sum + (m.clicks || 0), 0);
+    const totalImpressions = Math.max(0, userMetrics.reduce((sum, m) => sum + Math.max(0, m.impressions || 0), 0));
+    const totalClicks = Math.max(0, userMetrics.reduce((sum, m) => sum + Math.max(0, m.clicks || 0), 0));
 
     const formatNumber = (num: number) => {
       if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
@@ -46,9 +46,9 @@ export const getPlatformAnalytics = async (req: AuthRequest, res: Response): Pro
     });
 
     const engagementData = last7Days.map((day, index) => {
-      const dayViews = userMetrics
+      const dayViews = Math.max(0, userMetrics
         .filter(m => m.recordedAt.toISOString().split('T')[0] === day)
-        .reduce((sum, m) => sum + (m.impressions || 0), 0);
+        .reduce((sum, m) => sum + Math.max(0, m.impressions || 0), 0));
       
       return { 
         name: `Day ${index + 1}`, 
@@ -86,19 +86,20 @@ export const getPlatformAnalytics = async (req: AuthRequest, res: Response): Pro
     // 5. Transform Campaigns for Performance Table
     const campaignPerformance = campaigns.length > 0 ? campaigns.map(c => {
       const cMetrics = c.metrics || [];
-      const views = cMetrics.reduce((sum, m) => sum + m.impressions, 0);
-      const clicks = cMetrics.reduce((sum, m) => sum + m.clicks, 0);
-      const spend = cMetrics.reduce((sum, m) => sum + Number(m.spend), 0);
+      const views = Math.max(0, cMetrics.reduce((sum, m) => sum + Math.max(0, m.impressions), 0));
+      const clicks = Math.max(0, cMetrics.reduce((sum, m) => sum + Math.max(0, m.clicks), 0));
+      const spend = Math.max(0, cMetrics.reduce((sum, m) => sum + Math.max(0, Number(m.spend)), 0));
       const engagement = views > 0 ? ((clicks / views) * 100).toFixed(1) + '%' : '0.0%';
       
-      const revenueValue = c.budget > 0 ? (c.budget * 0.8) : (spend > 0 ? spend * 1.5 : 0);
+      const budgetVal = Math.max(0, c.budget || 0);
+      const revenueValue = budgetVal > 0 ? (budgetVal * 0.8) : (spend > 0 ? spend * 1.5 : 0);
 
       return {
         name: c.name,
         image: c.Asset?.[0]?.url || "https://images.unsplash.com/photo-1562322140-8baeececf3df?q=80&w=2669&auto=format&fit=crop",
         views: views > 0 ? views.toLocaleString() : (Math.floor(Math.random() * 1000) + 1000).toLocaleString(),
         engagement: views > 0 ? engagement : "7.5%",
-        conversions: views > 0 ? Math.floor(clicks * 0.1).toString() : "12",
+        conversions: views > 0 ? Math.max(0, Math.floor(clicks * 0.1)).toString() : "12",
         revenue: revenueValue > 0 ? `$${revenueValue.toLocaleString()}` : "$0"
       };
     }) : [
@@ -190,7 +191,7 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
       campaignsByStatus[s] = (campaignsByStatus[s] || 0) + 1;
     });
 
-    const totalBudget = campaigns.reduce((sum, c) => sum + (c.budget || 0), 0);
+    const totalBudget = Math.max(0, campaigns.reduce((sum, c) => sum + Math.max(0, c.budget || 0), 0));
 
     // ── 2. AI Session Breakdown by Type ──
     const sessionsByType: Record<string, number> = {};
@@ -212,7 +213,8 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
     // ── 4. Quality Audit Summary ──
     const avgScore = (arr: (number | null | undefined)[]) => {
       const valid = arr.filter((v): v is number => v != null);
-      return valid.length > 0 ? Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10 : null;
+      const score = valid.length > 0 ? Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10 : null;
+      return score !== null ? Math.max(0, score) : null;
     };
 
     const qualitySummary = {
@@ -233,7 +235,7 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
     assets.forEach(a => {
       const t = a.type || 'other';
       assetsByType[t] = (assetsByType[t] || 0) + 1;
-      totalStorageBytes += (a.fileSize || 0);
+      totalStorageBytes += Math.max(0, a.fileSize || 0);
     });
 
     // ── 6. Content Generation Timeline (last 30 days) ──
@@ -288,12 +290,12 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
       return {
         date: dayStr,
         label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        images: dayItems.filter(i => i.type === 'image').length,
-        audio: dayItems.filter(i => i.type === 'audio').length,
-        copy: dayItems.filter(i => i.type === 'copy').length,
-        video: dayItems.filter(i => i.type === 'video').length,
-        uploads: dayItems.filter(i => !['image', 'audio', 'copy', 'video'].includes(i.type)).length,
-        total: dayItems.length
+        images: Math.max(0, dayItems.filter(i => i.type === 'image').length),
+        audio: Math.max(0, dayItems.filter(i => i.type === 'audio').length),
+        copy: Math.max(0, dayItems.filter(i => i.type === 'copy').length),
+        video: Math.max(0, dayItems.filter(i => i.type === 'video').length),
+        uploads: Math.max(0, dayItems.filter(i => !['image', 'audio', 'copy', 'video'].includes(i.type)).length),
+        total: Math.max(0, dayItems.length)
       };
     });
 
@@ -301,12 +303,13 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
     const campaignRanking = campaigns
       .map((c: any) => {
         const cMetrics = c.metrics || [];
-        const views = cMetrics.reduce((sum: number, m: any) => sum + (m.impressions || 0), 0);
-        const clicks = cMetrics.reduce((sum: number, m: any) => sum + (m.clicks || 0), 0);
-        const spend = cMetrics.reduce((sum: number, m: any) => sum + Number(m.spend || 0), 0);
+        const views = Math.max(0, cMetrics.reduce((sum: number, m: any) => sum + Math.max(0, m.impressions || 0), 0));
+        const clicks = Math.max(0, cMetrics.reduce((sum: number, m: any) => sum + Math.max(0, m.clicks || 0), 0));
+        const spend = Math.max(0, cMetrics.reduce((sum: number, m: any) => sum + Math.max(0, Number(m.spend || 0)), 0));
         const engagement = views > 0 ? ((clicks / views) * 100).toFixed(1) + '%' : '0.0%';
         
-        const revenueValue = c.budget && c.budget > 0 ? (c.budget * 0.8) : (spend > 0 ? spend * 1.5 : 0);
+        const budgetVal = Math.max(0, c.budget || 0);
+        const revenueValue = budgetVal > 0 ? (budgetVal * 0.8) : (spend > 0 ? spend * 1.5 : 0);
 
         // Link AISession if exists for this campaign
         const matchingSession = aiSessions.find(s => 
@@ -318,13 +321,13 @@ export const getDeepAnalytics = async (req: AuthRequest, res: Response): Promise
           id: c.id,
           name: c.name,
           status: c.status,
-          budget: c.budget,
+          budget: budgetVal,
           platforms: c.platforms,
           createdAt: c.createdAt,
           image: c.Asset?.[0]?.url || "https://images.unsplash.com/photo-1562322140-8baeececf3df?q=80&w=2669&auto=format&fit=crop",
           views: views > 0 ? views.toLocaleString() : "0",
           engagement: engagement,
-          conversions: views > 0 ? Math.floor(clicks * 0.1).toString() : "0",
+          conversions: views > 0 ? Math.max(0, Math.floor(clicks * 0.1)).toString() : "0",
           revenue: revenueValue > 0 ? `$${revenueValue.toLocaleString()}` : "$0",
           aiSession: matchingSession ? {
             id: matchingSession.id,
